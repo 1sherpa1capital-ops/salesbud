@@ -1,0 +1,68 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --color-app-bg: #1E1F1C;
+  --color-app-surface: #272822; /* Monokai default bg */
+  --color-app-border: #3E3D32;
+  --color-app-text: #F8F8F2;
+  --color-app-dim: #75715E;
+  
+  --color-app-pink: #F92672;
+  --color-app-green: #A6E22E;
+  --color-app-blue: #66D9EF;
+  --color-app-yellow: #E6DB74;
+}
+
+body {
+  background-color: var(--color-app-bg);
+  color: var(--color-app-text);
+  font-family: 'Geist', 'Inter', system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+.binary-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  opacity: 0.15;
+  pointer-events: none;
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--color-app-dim);
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  white-space: pre;
+  user-select: none;
+}
+
+.binary-bg::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, transparent 0%, var(--color-app-bg) 80%);
+}
+
+::selection {
+  background-color: var(--color-app-dim);
+  color: var(--color-app-text);
+}
+
+.font-mono {
+  font-family: 'Geist Mono', 'JetBrains Mono', 'Fira Code', 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+}
+
+.terminal-shadow {
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}

@@ -1,0 +1,22 @@
+{
+  "eval_id": 2,
+  "eval_name": "webhook-handler-threading-baseline",
+  "prompt": "I need a Next.js webhook handler that receives emails from Resend and sends a threaded auto-reply. When someone emails support@mycompany.com, I want to immediately reply with 'Thanks for your email, we'll respond within 24 hours' and have it appear threaded in their inbox.",
+  "assertions": [
+    {
+      "text": "Verifies webhook signature",
+      "passed": null,
+      "evidence": ""
+    },
+    {
+      "text": "Extracts message_id from webhook payload",
+      "passed": null,
+      "evidence": ""
+    },
+    {
+      "text": "Handles email.received event type",
+      "passed": null,
+      "evidence": ""
+    }
+  ]
+}

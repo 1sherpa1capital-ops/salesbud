@@ -1,0 +1,101 @@
+{
+  "skill_name": "email-threading",
+  "evals": [
+    {
+      "id": 1,
+      "name": "basic-threading-workflow",
+      "prompt": "Show me how to send an email and then reply to it maintaining the thread using Resend. I need to send an initial email to a client, and when they reply, I want to send back a response that appears in the same Gmail thread.",
+      "expected_output": "Code example showing: 1) Sending initial email with Message-ID header, 2) Handling webhook with message_id from reply, 3) Sending threaded reply with In-Reply-To and References headers",
+      "files": [],
+      "assertions": [
+        {
+          "type": "code_contains",
+          "target": "In-Reply-To",
+          "description": "Uses In-Reply-To header"
+        },
+        {
+          "type": "code_contains",
+          "target": "References",
+          "description": "Uses References header"
+        },
+        {
+          "type": "code_contains",
+          "target": "message_id",
+          "description": "References message_id from webhook"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "webhook-handler-threading",
+      "prompt": "I need a Next.js webhook handler that receives emails from Resend and sends a threaded auto-reply. When someone emails support@mycompany.com, I want to immediately reply with 'Thanks for your email, we'll respond within 24 hours' and have it appear threaded in their inbox.",
+      "expected_output": "Complete Next.js webhook handler that: 1) Verifies webhook signature, 2) Extracts message_id from email.received event, 3) Sends threaded auto-reply with proper headers",
+      "files": [],
+      "assertions": [
+        {
+          "type": "code_contains",
+          "target": "webhooks.verify",
+          "description": "Verifies webhook signature"
+        },
+        {
+          "type": "code_contains",
+          "target": "event.data.message_id",
+          "description": "Extracts message_id from webhook payload"
+        },
+        {
+          "type": "code_contains",
+          "target": "email.received",
+          "description": "Handles email.received event type"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "conversation-tracking",
+      "prompt": "How do I track email conversations with Resend? I want to send emails to clients and when they reply, be able to look up the original conversation and send a properly threaded response that references all previous emails.",
+      "expected_output": "Solution showing: 1) Database schema for storing conversations with Message-IDs, 2) Function to build References chain from conversation history, 3) Example of sending reply with complete References header",
+      "files": [],
+      "assertions": [
+        {
+          "type": "code_contains",
+          "target": "References",
+          "description": "Builds References header"
+        },
+        {
+          "type": "code_contains",
+          "target": "conversation",
+          "description": "Tracks conversation state"
+        },
+        {
+          "type": "code_contains",
+          "target": ".join(' ')",
+          "description": "Joins Message-IDs with space separator for References"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "quoted-reply-formatting",
+      "prompt": "I need to send a threaded email reply with quoted text from the original message. When I reply to a client's email, I want to include their original message indented below my response, similar to how Gmail does it.",
+      "expected_output": "Code showing: 1) HTML formatting for quoted reply with border-left styling, 2) Text version with '>' quoted lines, 3) Proper threading headers",
+      "files": [],
+      "assertions": [
+        {
+          "type": "code_contains",
+          "target": "border-left",
+          "description": "Uses border-left for HTML quote"
+        },
+        {
+          "type": "code_contains",
+          "target": "On",
+          "description": "Includes 'On [date], [sender] wrote:'"
+        },
+        {
+          "type": "code_contains",
+          "target": "In-Reply-To",
+          "description": "Includes threading headers"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "eval_id": 1,
+  "eval_name": "basic-threading-workflow-baseline",
+  "expectations": [
+    {
+      "text": "Uses In-Reply-To header",
+      "passed": true,
+      "evidence": "Found: 'In-Reply-To': webhookData.message_id and 'In-Reply-To': replyToMessageId in multiple places"
+    },
+    {
+      "text": "Uses References header",
+      "passed": true,
+      "evidence": "Found: 'References': references and shows building from conversation messages"
+    },
+    {
+      "text": "References message_id from webhook",
+      "passed": true,
+      "evidence": "Shows using event.data.message_id and emphasizes 'Use data.message_id for threading, NOT data.email_id'"
+    }
+  ]
+}

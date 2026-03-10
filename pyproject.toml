@@ -1,0 +1,54 @@
+[project]
+name = "salesbud"
+version = "1.0.0"
+description = "Autonomous Outbound SDR Agent - LinkedIn DM Sequencer"
+authors = [
+    {name = "Synto Labs"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "playwright>=1.58.0",       # latest: 1.58.0
+    "python-dotenv>=1.2.0",     # latest: 1.2.1
+    "resend>=2.23.0",           # latest: 2.23.0
+    # v2.0 additions (email discovery + enrichment)
+    "crawl4ai>=0.4.0",          # open source LLM-ready web scraper
+    "browser-use>=0.1.0",       # AI-steered browser automation
+    "dnspython>=2.7.0",         # MX lookups for SMTP email verification
+    "requests>=2.32.0",         # HTTP requests for email_finder scraping
+    "beautifulsoup4>=4.12.0",   # HTML parsing for email_finder
+    "rich>=13.0.0",             # CLI TUI and terminal formatting
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+salesbud = "src.salesbud.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/salesbud"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39']
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

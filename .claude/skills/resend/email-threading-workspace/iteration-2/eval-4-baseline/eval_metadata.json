@@ -1,0 +1,10 @@
+{
+  "eval_id": 4,
+  "eval_name": "quoted-reply-formatting-baseline",
+  "prompt": "I need to send a threaded email reply with quoted text from the original message. When I reply to a client's email, I want to include their original message indented below my response, similar to how Gmail does it.",
+  "assertions": [
+    {"type": "code_contains", "target": "border-left", "description": "Uses border-left for HTML quote"},
+    {"type": "code_contains", "target": "On", "description": "Includes 'On [date], [sender] wrote:'"},
+    {"type": "code_contains", "target": "In-Reply-To", "description": "Includes threading headers"}
+  ]
+}

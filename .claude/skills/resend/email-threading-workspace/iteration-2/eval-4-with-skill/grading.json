@@ -1,0 +1,21 @@
+{
+  "eval_id": 4,
+  "eval_name": "quoted-reply-formatting",
+  "expectations": [
+    {
+      "text": "Uses border-left for HTML quote",
+      "passed": true,
+      "evidence": "Found: style=\"border-left: 1px solid #dadce0; padding-left: 16px; ...\" with Gmail-style formatting"
+    },
+    {
+      "text": "Includes 'On [date], [sender] wrote:'",
+      "passed": true,
+      "evidence": "Found: On ${quoteDate}, ${fromName} wrote: in both HTML and text versions"
+    },
+    {
+      "text": "Includes threading headers",
+      "passed": true,
+      "evidence": "Shows complete headers: 'Message-ID', 'In-Reply-To', 'References' in sendQuotedReply function"
+    }
+  ]
+}

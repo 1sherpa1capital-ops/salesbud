@@ -1,0 +1,21 @@
+{
+  "eval_id": 1,
+  "eval_name": "basic-threading-workflow-baseline",
+  "expectations": [
+    {
+      "text": "Uses In-Reply-To header",
+      "passed": true,
+      "evidence": "Found: 'In-Reply-To': lastOutbound?.message_id and 'In-Reply-To': originalEmailRecord.lastMessageId"
+    },
+    {
+      "text": "Uses References header",
+      "passed": true,
+      "evidence": "Found: 'References': references and const references = messages.rows.map(m => m.message_id).join(' ')"
+    },
+    {
+      "text": "References message_id from webhook",
+      "passed": false,
+      "evidence": "Uses generic webhook handler with headers['message-id'] but does not emphasize using data.message_id from Resend webhook specifically. Mentions Resend limitations for inbound email."
+    }
+  ]
+}

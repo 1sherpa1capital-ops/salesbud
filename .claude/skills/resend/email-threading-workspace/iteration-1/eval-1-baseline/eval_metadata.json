@@ -1,0 +1,22 @@
+{
+  "eval_id": 1,
+  "eval_name": "basic-threading-workflow-baseline",
+  "prompt": "Show me how to send an email and then reply to it maintaining the thread using Resend. I need to send an initial email to a client, and when they reply, I want to send back a response that appears in the same Gmail thread.",
+  "assertions": [
+    {
+      "text": "Uses In-Reply-To header",
+      "passed": null,
+      "evidence": ""
+    },
+    {
+      "text": "Uses References header",
+      "passed": null,
+      "evidence": ""
+    },
+    {
+      "text": "References message_id from webhook",
+      "passed": null,
+      "evidence": ""
+    }
+  ]
+}

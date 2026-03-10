@@ -1,0 +1,10 @@
+{
+  "eval_id": 3,
+  "eval_name": "conversation-tracking",
+  "prompt": "How do I track email conversations with Resend? I want to send emails to clients and when they reply, be able to look up the original conversation and send a properly threaded response that references all previous emails.",
+  "assertions": [
+    {"type": "code_contains", "target": "References", "description": "Builds References header"},
+    {"type": "code_contains", "target": "conversation", "description": "Tracks conversation state"},
+    {"type": "code_contains", "target": "join", "description": "Joins Message-IDs for References"}
+  ]
+}

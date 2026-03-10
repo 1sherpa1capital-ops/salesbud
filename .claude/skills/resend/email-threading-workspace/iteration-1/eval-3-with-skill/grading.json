@@ -1,0 +1,21 @@
+{
+  "eval_id": 3,
+  "eval_name": "conversation-tracking",
+  "expectations": [
+    {
+      "text": "Builds References header",
+      "passed": true,
+      "evidence": "Found: 'References': references and builds it from all conversation messages"
+    },
+    {
+      "text": "Tracks conversation state",
+      "passed": true,
+      "evidence": "Complete Prisma schema with Conversation and Message models, tracks direction, message_id, in_reply_to"
+    },
+    {
+      "text": "Joins Message-IDs for References",
+      "passed": true,
+      "evidence": "Explicitly shows: const references = conversation.messages.map(m => m.messageId).join(' ')"
+    }
+  ]
+}

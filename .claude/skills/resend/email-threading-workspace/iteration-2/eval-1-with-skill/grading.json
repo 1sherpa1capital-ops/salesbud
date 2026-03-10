@@ -1,0 +1,21 @@
+{
+  "eval_id": 1,
+  "eval_name": "basic-threading-workflow",
+  "expectations": [
+    {
+      "text": "Uses In-Reply-To header",
+      "passed": true,
+      "evidence": "Found: 'In-Reply-To': replyToMessageId in sendThreadedReply function and 'In-Reply-To': originalEmail.message_id in replyWithQuote"
+    },
+    {
+      "text": "Uses References header",
+      "passed": true,
+      "evidence": "Found: 'References': references and const references = messages.map(m => m.messageId).join(' ')"
+    },
+    {
+      "text": "References message_id from webhook",
+      "passed": true,
+      "evidence": "Explicitly shows extracting message_id from event.data and notes 'Critical: Use event.data.message_id (not event.data.email_id) for threading'"
+    }
+  ]
+}

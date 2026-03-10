@@ -1,0 +1,21 @@
+{
+  "eval_id": 4,
+  "eval_name": "quoted-reply-formatting-baseline",
+  "expectations": [
+    {
+      "text": "Uses border-left for HTML quote",
+      "passed": true,
+      "evidence": "Found: style=\"border-left: 2px solid #ddd; margin-left: 10px; ...\""
+    },
+    {
+      "text": "Includes 'On [date], [sender] wrote:'",
+      "passed": true,
+      "evidence": "Found: On Monday, March 3, 2025, John Doe <john@example.com> wrote: in text version"
+    },
+    {
+      "text": "Includes threading headers",
+      "passed": false,
+      "evidence": "Shows HTML and text formatting but does NOT include In-Reply-To, References, or Message-ID headers for threading"
+    }
+  ]
+}

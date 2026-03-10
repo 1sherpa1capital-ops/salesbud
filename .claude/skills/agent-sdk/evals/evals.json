@@ -1,0 +1,53 @@
+{
+  "skill_name": "agent-sdk",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a Python agent using the Agent SDK that reads files from the current directory and lists them using Glob. Show me the complete code with proper async setup.",
+      "expected_output": "Python code using claude_agent_sdk with query() function, ClaudeAgentOptions with allowed_tools containing Read and Glob, proper async/await pattern",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Set up a subagent called 'security-reviewer' that has read-only access to code files and is invoked by the main agent. Include proper AgentDefinition with description, prompt, and tools restriction.",
+      "expected_output": "AgentDefinition with description, prompt, tools=['Read', 'Glob', 'Grep'], and allowed_tools including 'Agent' in main options",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Create a custom MCP tool called 'calculator' with 'add' and 'multiply' operations, then show how to configure it with mcp_servers in ClaudeAgentOptions.",
+      "expected_output": "@tool decorator usage, create_sdk_mcp_server() call, mcp_servers configuration with tool names in allowed_tools using mcp__ prefix",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Write code that maintains a conversation across multiple queries using ClaudeSDKClient in Python. First query asks about files, second asks to analyze one.",
+      "expected_output": "ClaudeSDKClient as async context manager, multiple client.query() calls, client.receive_response() for processing, session maintained across calls",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Add a PostToolUse hook that logs whenever the agent modifies a file. The hook should match on Edit and Write tools.",
+      "expected_output": "HookMatcher with matcher='Edit|Write', hooks array with callback function, access to tool_input in input_data, return empty dict to allow",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Create an agent with permission_mode='acceptEdits' so it can automatically edit files without prompts. Also explain the different permission modes available.",
+      "expected_output": "permission_mode='acceptEdits' in options, explanation of default, bypassPermissions, plan modes",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Show how to resume a specific session by capturing the session_id from a previous query, then using it in a new query to continue the conversation.",
+      "expected_output": "Capture session_id from ResultMessage or SystemMessage, use resume=session_id in ClaudeAgentOptions for subsequent query",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Configure structured output so the agent returns JSON matching a specific schema for bug reports with fields: bug_count (integer), severity (enum: low/medium/high).",
+      "expected_output": "output_format with type='json_schema', schema definition with properties and required fields",
+      "files": []
+    }
+  ]
+}

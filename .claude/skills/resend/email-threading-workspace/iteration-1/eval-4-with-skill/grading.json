@@ -1,0 +1,21 @@
+{
+  "eval_id": 4,
+  "eval_name": "quoted-reply-formatting",
+  "expectations": [
+    {
+      "text": "Uses border-left for HTML quote",
+      "passed": true,
+      "evidence": "Found: style=\"border-left: 2px solid #ccc; padding-left: 10px; ...\" with visual example"
+    },
+    {
+      "text": "Includes 'On [date], [sender] wrote:'",
+      "passed": true,
+      "evidence": "Found: <strong>On ${dateStr}, ${originalEmail.from} wrote:</strong> in both HTML and text versions"
+    },
+    {
+      "text": "Includes threading headers",
+      "passed": true,
+      "evidence": "Shows complete headers: 'Message-ID', 'In-Reply-To', 'References' with join(' ')"
+    }
+  ]
+}

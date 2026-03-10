@@ -1,0 +1,98 @@
+{
+  "skill_name": "email-threading",
+  "iteration": 2,
+  "summary": {
+    "with_skill": {
+      "pass_rate": 1.0,
+      "avg_time_seconds": 87.4,
+      "avg_tokens": 30158
+    },
+    "baseline": {
+      "pass_rate": 1.0,
+      "avg_time_seconds": 99.8,
+      "avg_tokens": 36573
+    }
+  },
+  "results": [
+    {
+      "eval_id": 1,
+      "eval_name": "basic-threading-workflow",
+      "with_skill": {
+        "pass_rate": 1.0,
+        "time_seconds": 98.9,
+        "tokens": 30394,
+        "assertions_passed": 3,
+        "assertions_total": 3
+      },
+      "baseline": {
+        "pass_rate": 1.0,
+        "time_seconds": 89.6,
+        "tokens": 43101,
+        "assertions_passed": 3,
+        "assertions_total": 3
+      }
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "webhook-handler-threading",
+      "with_skill": {
+        "pass_rate": 1.0,
+        "time_seconds": 67.4,
+        "tokens": 28961,
+        "assertions_passed": 3,
+        "assertions_total": 3
+      },
+      "baseline": {
+        "pass_rate": 1.0,
+        "time_seconds": 79.5,
+        "tokens": 27640,
+        "assertions_passed": 3,
+        "assertions_total": 3
+      }
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "conversation-tracking",
+      "with_skill": {
+        "pass_rate": 1.0,
+        "time_seconds": 86.2,
+        "tokens": 30331,
+        "assertions_passed": 3,
+        "assertions_total": 3
+      },
+      "baseline": {
+        "pass_rate": 1.0,
+        "time_seconds": 131.6,
+        "tokens": 43689,
+        "assertions_passed": 3,
+        "assertions_total": 3
+      }
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "quoted-reply-formatting",
+      "with_skill": {
+        "pass_rate": 1.0,
+        "time_seconds": 82.4,
+        "tokens": 29947,
+        "assertions_passed": 3,
+        "assertions_total": 3
+      },
+      "baseline": {
+        "pass_rate": 1.0,
+        "time_seconds": 98.4,
+        "tokens": 31860,
+        "assertions_passed": 3,
+        "assertions_total": 3
+      }
+    }
+  ],
+  "analyst_notes": [
+    "Skill achieved 100% pass rate on all 4 evals (12/12 assertions)",
+    "Baseline also achieved 100% pass rate - significant improvement from iteration 1 (75%)",
+    "The Common Mistakes section added in iteration 1 successfully educated baseline responses",
+    "Skill responses are more consistent in quality and structure",
+    "Baseline eval 3 took significantly longer (131.6s vs 86.2s) with higher token usage",
+    "Skill averages 87.4s vs Baseline 99.8s - skill is 12% faster on average"
+  ]
+}

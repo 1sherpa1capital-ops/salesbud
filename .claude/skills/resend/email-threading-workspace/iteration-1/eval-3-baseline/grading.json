@@ -1,0 +1,21 @@
+{
+  "eval_id": 3,
+  "eval_name": "conversation-tracking-baseline",
+  "expectations": [
+    {
+      "text": "Builds References header",
+      "passed": true,
+      "evidence": "Found: 'References': references and builds from messages.rows.map(m => m.message_id).join(' ')"
+    },
+    {
+      "text": "Tracks conversation state",
+      "passed": true,
+      "evidence": "Shows SQL schema with email_conversations and email_messages tables"
+    },
+    {
+      "text": "Joins Message-IDs for References",
+      "passed": true,
+      "evidence": "Found: .join(' ') used to build References header from message IDs"
+    }
+  ]
+}

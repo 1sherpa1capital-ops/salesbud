@@ -1,0 +1,21 @@
+{
+  "eval_id": 2,
+  "eval_name": "webhook-handler-threading-baseline",
+  "expectations": [
+    {
+      "text": "Verifies webhook signature",
+      "passed": true,
+      "evidence": "Has resend.webhooks.verify() with Svix headers for webhook verification"
+    },
+    {
+      "text": "Extracts message_id from webhook payload",
+      "passed": true,
+      "evidence": "Extracts from event.data.message_id and uses emailData.message_id for threading headers"
+    },
+    {
+      "text": "Handles email.received event type",
+      "passed": true,
+      "evidence": "Checks: if (event.type === 'email.received') in webhook handler"
+    }
+  ]
+}

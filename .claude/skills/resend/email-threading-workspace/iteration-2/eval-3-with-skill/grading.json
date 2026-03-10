@@ -1,0 +1,21 @@
+{
+  "eval_id": 3,
+  "eval_name": "conversation-tracking",
+  "expectations": [
+    {
+      "text": "Builds References header",
+      "passed": true,
+      "evidence": "Found: 'References': references and builds it from messages.map(m => m.messageId).join(' ')"
+    },
+    {
+      "text": "Tracks conversation state",
+      "passed": true,
+      "evidence": "Complete database schema with Conversation and Message interfaces, tracks direction, messageId, inReplyTo, references"
+    },
+    {
+      "text": "Joins Message-IDs with space separator for References",
+      "passed": true,
+      "evidence": "Explicitly shows: .join(' ') used to build References chain from conversation messages"
+    }
+  ]
+}

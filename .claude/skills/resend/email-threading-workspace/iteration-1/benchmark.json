@@ -1,0 +1,96 @@
+{
+  "skill_name": "email-threading",
+  "iteration": 1,
+  "summary": {
+    "with_skill": {
+      "pass_rate": 1.0,
+      "avg_time_seconds": 66.4,
+      "avg_tokens": 34337
+    },
+    "baseline": {
+      "pass_rate": 0.75,
+      "avg_time_seconds": 69.3,
+      "avg_tokens": 27626
+    }
+  },
+  "results": [
+    {
+      "eval_id": 1,
+      "eval_name": "basic-threading-workflow",
+      "with_skill": {
+        "pass_rate": 1.0,
+        "time_seconds": 63.5,
+        "tokens": 34181,
+        "assertions_passed": 3,
+        "assertions_total": 3
+      },
+      "baseline": {
+        "pass_rate": 0.67,
+        "time_seconds": 91.8,
+        "tokens": 30055,
+        "assertions_passed": 2,
+        "assertions_total": 3
+      }
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "webhook-handler-threading",
+      "with_skill": {
+        "pass_rate": 1.0,
+        "time_seconds": 54.8,
+        "tokens": 33742,
+        "assertions_passed": 3,
+        "assertions_total": 3
+      },
+      "baseline": {
+        "pass_rate": 0.67,
+        "time_seconds": 78.3,
+        "tokens": 29269,
+        "assertions_passed": 2,
+        "assertions_total": 3
+      }
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "conversation-tracking",
+      "with_skill": {
+        "pass_rate": 1.0,
+        "time_seconds": 87.1,
+        "tokens": 35278,
+        "assertions_passed": 3,
+        "assertions_total": 3
+      },
+      "baseline": {
+        "pass_rate": 1.0,
+        "time_seconds": 70.2,
+        "tokens": 28741,
+        "assertions_passed": 3,
+        "assertions_total": 3
+      }
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "quoted-reply-formatting",
+      "with_skill": {
+        "pass_rate": 1.0,
+        "time_seconds": 60.2,
+        "tokens": 34046,
+        "assertions_passed": 3,
+        "assertions_total": 3
+      },
+      "baseline": {
+        "pass_rate": 0.67,
+        "time_seconds": 37.0,
+        "tokens": 27440,
+        "assertions_passed": 2,
+        "assertions_total": 3
+      }
+    }
+  ],
+  "analyst_notes": [
+    "Skill correctly emphasizes using event.data.message_id from Resend webhooks",
+    "Skill provides complete working examples with proper Resend SDK usage",
+    "Baseline responses often missed critical Resend-specific details (webhook structure, SES rewriting)",
+    "Skill responses are more comprehensive and accurate for Resend threading"
+  ]
+}
