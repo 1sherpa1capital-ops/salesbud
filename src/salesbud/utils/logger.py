@@ -1,64 +1,64 @@
 """
-Centralized logger for SalesBud CLI.
-Uses `rich` for TUI rendering, but strictly enforces JSON-safe output
-by routing all prints/logs to /dev/null when QUIET_MODE is enabled.
+Minimalist logger for SalesBud CLI.
+Clean, simple output with minimal visual noise.
 """
+
 from typing import Any, Optional
 from rich.console import Console
 
-# Use a standard console for human output
 console = Console()
 
-# We control this globally from main.py via set_quiet_mode
+# Global quiet mode
 _QUIET_MODE = False
 
+
 def set_quiet_mode(quiet: bool):
-    """Enable or disable quiet mode (suppresses all output except explicit JSON)."""
+    """Enable or disable quiet mode."""
     global _QUIET_MODE
     _QUIET_MODE = quiet
+
 
 def is_quiet() -> bool:
     return _QUIET_MODE
 
-def print_text(text: Any, *args, **kwargs):
-    """Print standard text via rich console. Suppressed in quiet mode."""
+
+def print_text(text: Any = "", *args, **kwargs):
+    """Print text (suppressed in quiet mode)."""
     if not _QUIET_MODE:
         console.print(text, *args, **kwargs)
 
+
 def info(text: str):
-    """Print an informational message."""
+    """Info message."""
     if not _QUIET_MODE:
-        console.print(f"[cyan]ℹ {text}[/cyan]")
+        console.print(f"[dim]› {text}[/dim]")
+
 
 def success(text: str):
-    """Print a success message."""
+    """Success message."""
     if not _QUIET_MODE:
         console.print(f"[green]✓ {text}[/green]")
 
+
 def warning(text: str):
-    """Print a warning message."""
+    """Warning message."""
     if not _QUIET_MODE:
-        console.print(f"[yellow]⚠ {text}[/yellow]")
+        console.print(f"[yellow]! {text}[/yellow]")
+
 
 def error(text: str):
-    """Print an error message."""
+    """Error message."""
     if not _QUIET_MODE:
         console.print(f"[red]✗ {text}[/red]")
 
-def step(text: str):
-    """Print a bold workflow step header."""
-    if not _QUIET_MODE:
-        console.print(f"\n[bold blue]--- {text} ---[/bold blue]")
 
-def rule(title: Optional[str] = None):
-    """Print a horizontal rule."""
+def step(text: str):
+    """Workflow step."""
     if not _QUIET_MODE:
-        if title:
-            console.rule(f"[bold]{title}[/bold]")
-        else:
-            console.rule()
+        console.print(f"\n[bold]{text}[/bold]")
+
 
 def header(text: str):
-    """Print a large header."""
+    """Section header."""
     if not _QUIET_MODE:
-        console.print(f"\n[bold magenta]=== {text} ===[/bold magenta]\n")
+        console.print(f"\n[bold]{text}[/bold]\n")
