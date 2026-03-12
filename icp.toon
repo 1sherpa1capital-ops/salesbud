@@ -1,6 +1,6 @@
 {
   "query": "CEO OR Founder OR VP",
-  "location": "Austin, TX OR Toronto, Canada",
+  "location": "London, UK OR Toronto, Canada OR New York, NY OR Austin, TX OR Sydney, Australia",
   "industry": "Marketing Agencies",
   "company_size": "11-50 employees",
   "pain_points": [
