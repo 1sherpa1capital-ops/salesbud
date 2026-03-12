@@ -318,6 +318,8 @@ def main():
 
 def _run_command(args: argparse.Namespace, use_toon: bool) -> None:
     """Dispatch to the appropriate command handler."""
+    import salesbud.utils.logger as logger
+
     if not args.command or args.command == "help":
         show_help()
         return
@@ -1099,10 +1101,9 @@ def _run_command(args: argparse.Namespace, use_toon: bool) -> None:
                 f"✓ Set company URL for {lead.get('name', 'Unknown')} → {validated.company_url}"
             )
 
-
     elif args.command == "research":
         from salesbud.services.researcher import perform_company_research
-        
+
         research_data = perform_company_research(args.lead_id)
         if use_toon:
             if research_data:
@@ -1117,11 +1118,13 @@ def _run_command(args: argparse.Namespace, use_toon: bool) -> None:
 
     elif args.command == "personalize":
         from salesbud.services.personalizer import generate_personalization
-        
+
         icebreaker = generate_personalization(args.lead_id)
         if use_toon:
             if icebreaker:
-                print_toon(True, 1, [{"lead_id": args.lead_id, "personalization_angle": icebreaker}])
+                print_toon(
+                    True, 1, [{"lead_id": args.lead_id, "personalization_angle": icebreaker}]
+                )
             else:
                 print_toon(False, 0, [], ["Failed to generate personalization angle"])
         else:
@@ -1129,6 +1132,7 @@ def _run_command(args: argparse.Namespace, use_toon: bool) -> None:
                 logger.print_text(f"✓ Personalization complete for lead {args.lead_id}")
             else:
                 logger.print_text(f"✗ Personalization failed for lead {args.lead_id}")
+
 
 if __name__ == "__main__":
     main()

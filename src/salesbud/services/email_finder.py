@@ -2,6 +2,12 @@
 Email discovery and verification service
 """
 
+# Suppress urllib3/requests version mismatch warnings (must be before imports)
+import warnings
+
+warnings.filterwarnings("ignore", message=".*urllib3.*", category=UserWarning)
+warnings.filterwarnings("ignore", message=".*RequestsDependencyWarning.*")
+
 import re
 import socket
 from concurrent.futures import ThreadPoolExecutor, as_completed
