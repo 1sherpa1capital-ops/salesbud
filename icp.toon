@@ -1,4 +1,12 @@
 {
-  "query": "CEO",
-  "location": "Austin, TX"
+  "query": "CEO OR Founder OR VP",
+  "location": "Austin, TX OR Toronto, Canada",
+  "industry": "Marketing Agencies",
+  "company_size": "11-50 employees",
+  "pain_points": [
+    "Manual outreach taking 2-3 hours daily",
+    "Need consistent lead generation",
+    "Want to scale without hiring more SDRs"
+  ],
+  "value_prop": "AI-powered outbound automation that handles prospecting end-to-end"
 }
