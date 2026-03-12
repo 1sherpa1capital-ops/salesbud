@@ -1,0 +1,8 @@
+2026/03/12-14:41:43.873 13b533 Reusing MANIFEST /Users/guestr/Desktop/syntolabs/salesbud/data/browser_state/Default/Session Storage/MANIFEST-000001
+2026/03/12-14:41:43.874 13b533 Recovering log #3
+2026/03/12-14:41:43.875 13b533 Level-0 table #3: started
+2026/03/12-14:41:43.877 13b533 Level-0 table #3: 14388 bytes OK
+2026/03/12-14:41:43.877 13b533 Recovering log #4
+2026/03/12-14:41:43.878 13b533 Reusing old log /Users/guestr/Desktop/syntolabs/salesbud/data/browser_state/Default/Session Storage/000004.log 
+2026/03/12-14:41:43.880 13b533 Delete type=0 #3
+2026/03/12-14:41:43.880 13b533 Delete type=2 #5

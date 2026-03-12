@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Test Results - Phase 2: Email Discovery & Company Enrichment (2026-03-12)
+All Phase 2 production tests completed successfully on Lead ID 22 (Herb Dyer):
+
+| Test | Status | Notes |
+|------|--------|-------|
+| `add-email` | ✅ PASS | Email test@example.com added successfully |
+| `email` | ✅ PASS | Resend email to delivered@resend.dev sent successfully |
+| `set-company-url` | ✅ PASS | Company URL https://vercel.com set |
+| `enrich` | ✅ PASS | Crawl4AI extracted company description and buying signals ("hiring") |
+| `research` | ✅ PASS | Agent-browser captured full page structure (106 interactive elements) |
+| `personalize` | ✅ PASS | Generated contextual icebreaker mentioning AI focus |
+| Database Verify | ✅ PASS | All fields (email, company_url, company_research, personalization_angle) persisted correctly |
+
+**Key Findings:**
+- Email delivery via Resend API functional
+- Crawl4AI enrichment working (0.95s fetch time)
+- Agent-browser research operational - captured 106 page elements
+- Personalization engine generating relevant angles based on research data
+- All database write operations confirmed with SQLite verification
+
 ### Added
 - **Zero-Config Search**: Added `icp.json` file parsing capability to the `scrape` and `workflow` commands. If you run those commands without passing the `--query` or `--location` arguments, they will now automatically look for an `icp.json` payload in the root directory.
 - **Persistent Auth**: Created a dedicated `login` command which launches a headed browser for the user to log into LinkedIn manually (solving 2FA headers/emails). State is cleanly saved to `./data/browser_state`, entirely replacing the unstable `.env` cookie pasting workflow.

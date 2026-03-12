@@ -13,8 +13,7 @@ dependencies = [
     "resend>=2.10.0",               # latest stable
     "pydantic>=2.11.0",             # input validation
     # v2.0 additions (email discovery + enrichment)
-    "crawl4ai>=0.5.0",              # open source LLM-ready web scraper
-    "browser-use>=0.1.45",          # AI-steered browser automation
+    "crawl4ai>=0.5.0",              # company enrichment
     "dnspython>=2.7.0",             # MX lookups for SMTP email verification
     "requests>=2.32.3",             # HTTP requests for email_finder scraping
     "beautifulsoup4>=4.13.0",       # HTML parsing for email_finder
