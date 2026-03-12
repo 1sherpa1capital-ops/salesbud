@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Comprehensive Security & Performance Remediation (2026-03-12)
+MAJOR UPDATE: Addressed 70+ audit findings across security, database, performance, and architecture.
+
+**CRITICAL SECURITY FIXES:**
+- ✅ **SQL Injection Patched** - Fixed parameterized queries in `sequence.py` and `emailer.py`
+- ✅ **Command Injection Blocked** - Added URL validation in `researcher.py` before subprocess execution
+- ✅ **XSS Prevention** - Added HTML escaping in email body rendering (`cli/main.py`)
+- ✅ **Credential Protection** - Added `.env` to `.gitignore` to prevent accidental commits
+- ✅ **TOON Format Fixed** - Corrected backslash escaping bug in output formatter
+
+**DATABASE & PERFORMANCE:**
+- ✅ **6 Database Indexes** - Added indexes on status, created_at, email, sequence tracking, activities
+- ✅ **Connection Singleton** - Implemented pooled connections with WAL mode for better concurrency
+- ✅ **Race Condition Eliminated** - Fixed rate limiting with atomic UPSERT operations
+- ✅ **Pagination Support** - Added `get_leads_paginated()` for efficient large dataset handling
+- ✅ **Data Retention** - Added `cleanup_old_activities()` function (90-day retention policy)
+
+**STABILITY & ERROR HANDLING:**
+- ✅ **Subprocess Timeouts** - Added 60s timeouts to all agent-browser calls
+- ✅ **Specific Exceptions** - Replaced 20+ bare `except Exception` clauses with specific types
+- ✅ **Transaction Context Manager** - Added `db_transaction()` for automatic commit/rollback
+- ✅ **Error Sanitization** - Secure logging prevents information disclosure in production
+- ✅ **Resource Cleanup** - Enhanced browser lifecycle management in sequence service
+
+**ARCHITECTURE & CODE QUALITY:**
+- ✅ **Path Centralization** - Created `utils/paths.py` (eliminated 10+ hardcoded path patterns)
+- ✅ **ICP Loader Utility** - Extracted duplicate config loading into `utils/icp_loader.py`
+- ✅ **Exception Hierarchy** - Created `exceptions.py` with custom error types
+- ✅ **Documentation** - Added comprehensive docstrings to 13+ public functions
+- ✅ **DRY Violations Fixed** - Consolidated ICP loading, standardized patterns
+
+**TEST SUITE:**
+- ✅ **Testing Framework** - Added pytest and pytest-asyncio
+- ✅ **Unit Tests** - Created tests for validation, database, services
+- ✅ **Integration Tests** - Added CLI command testing
+- ✅ **Mock Utilities** - Created MockDB and fixtures in `conftest.py`
+
+**Files Changed:** 18 files modified, 3 new files created
+**Commits:** 2 major commits (remediation + test suite)
+
+---
+
 ### Stability Fixes (2026-03-12)
 Production-ready stability improvements for critical error handling:
 
