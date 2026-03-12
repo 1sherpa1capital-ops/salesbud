@@ -1,8 +1,9 @@
 import subprocess
 from typing import Optional
 from urllib.parse import urlparse
+
+from salesbud.models.lead import get_lead_by_id, update_lead_research
 from salesbud.utils import logger
-from salesbud.models.lead import update_lead_research, get_lead_by_id
 
 
 def validate_url(url: str) -> bool:

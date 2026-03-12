@@ -159,9 +159,11 @@ def guess_email_patterns(first_name: str, last_name: str, domain: str) -> list:
         f"{first}{last}@{domain}",
         f"{first[0]}{last}@{domain}" if first else None,
         f"{first}{last[0]}@{domain}" if last else None,
-        f"{first_name[0] if first_name else ''}{last_name}@{domain}"
-        if first_name and last_name
-        else None,
+        (
+            f"{first_name[0] if first_name else ''}{last_name}@{domain}"
+            if first_name and last_name
+            else None
+        ),
     ]
 
     return [p for p in patterns if p]

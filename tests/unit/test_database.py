@@ -2,12 +2,6 @@
 Unit tests for database operations
 """
 
-import pytest
-import sqlite3
-from datetime import datetime
-
-from tests.conftest import MockDB
-
 
 class TestMockDB:
     """Test mock database implementation"""

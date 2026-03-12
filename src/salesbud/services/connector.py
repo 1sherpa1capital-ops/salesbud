@@ -4,9 +4,9 @@ LinkedIn Connection Manager - Optimized for single browser session
 
 import os
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
-from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
+from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 
 import salesbud.utils.logger as logger
 from salesbud.database import (

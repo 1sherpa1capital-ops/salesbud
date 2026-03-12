@@ -2,11 +2,9 @@
 Unit tests for services (with mocked dependencies)
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 from salesbud.services.email_finder import find_emails_on_page
-from salesbud.services.email_finder import extract_domain_from_linkedin
 
 
 class TestEmailFinder:

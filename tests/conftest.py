@@ -4,8 +4,8 @@ Test configuration and fixtures for SalesBud
 
 import os
 import tempfile
+
 import pytest
-from pathlib import Path
 
 # Set test environment variables before importing salesbud
 os.environ.setdefault("TESTING", "true")

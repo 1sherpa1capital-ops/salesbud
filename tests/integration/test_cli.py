@@ -2,9 +2,7 @@
 Integration tests for CLI commands
 """
 
-import pytest
 import subprocess
-import json
 
 
 class TestCLIStatus:

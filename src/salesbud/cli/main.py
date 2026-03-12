@@ -5,12 +5,10 @@ LinkedIn DM Sequencer + Cold Email via Resend
 """
 
 import argparse
-import json
 import sys
 from typing import Optional
 
 from pydantic import ValidationError
-from toon_format import encode, decode
 
 import salesbud.utils.logger as logger
 from salesbud.cli.dashboard import show_dashboard, show_help, show_lead_detail
@@ -959,15 +957,15 @@ def _run_command(args: argparse.Namespace, use_toon: bool) -> None:
                         "name": lead.get("name") if lead else None,
                         "company": lead.get("company") if lead else None,
                         "company_url": lead.get("company_url") if lead else None,
-                        "company_description": updated_lead.get("company_description")
-                        if updated_lead
-                        else None,
-                        "company_size_est": updated_lead.get("company_size_est")
-                        if updated_lead
-                        else None,
-                        "buying_signals": updated_lead.get("buying_signals")
-                        if updated_lead
-                        else None,
+                        "company_description": (
+                            updated_lead.get("company_description") if updated_lead else None
+                        ),
+                        "company_size_est": (
+                            updated_lead.get("company_size_est") if updated_lead else None
+                        ),
+                        "buying_signals": (
+                            updated_lead.get("buying_signals") if updated_lead else None
+                        ),
                         "enriched_at": updated_lead.get("enriched_at") if updated_lead else None,
                     }
                 ]

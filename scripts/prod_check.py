@@ -13,9 +13,9 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-
-from toon_format import encode, decode
 from typing import Any
+
+from toon_format import decode
 
 # ── Colours ────────────────────────────────────────────────────────────────
 GREEN = "\033[92m"
