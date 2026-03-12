@@ -3,18 +3,23 @@ LinkedIn DM Sequence Engine
 NEPQ-based 5-step DM sequence with dry-run support
 """
 
-import salesbud.utils.logger as logger
+import datetime
 import random
-from typing import List, Dict, Any
-from salesbud.database import is_dry_run, log_activity, get_db
-from salesbud.models.lead import get_lead_by_id, update_lead_status, update_lead_dm_sent
+from typing import Any, Dict, List
+
+import salesbud.utils.logger as logger
+from salesbud.database import (
+    get_db,
+    increment_daily_count,
+    is_dry_run,
+    log_activity,
+)
+from salesbud.models.lead import get_lead_by_id, update_lead_dm_sent, update_lead_status
 from salesbud.utils.browser import (
-    get_stealth_context,
-    create_stealth_page,
-    safe_goto,
     check_for_challenge,
-    random_delay,
+    get_persistent_context,
     jitter_delay,
+    safe_goto,
 )
 
 DM_TEMPLATES = {
@@ -50,6 +55,9 @@ DEFAULT_VARS = {
 
 def personalize_dm(lead: Dict[str, Any], step: int) -> str:
     """Generate personalized DM for a lead at a given sequence step."""
+    if step == 1 and lead.get("personalization_angle"):
+        return lead["personalization_angle"]
+
     template = DM_TEMPLATES[step]["template"]
     vars = DEFAULT_VARS.copy()
     vars["name"] = lead.get("name", "there")
@@ -73,9 +81,9 @@ def get_leads_due_for_step(min_days: int = 3) -> List[Dict[str, Any]]:
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(f"""
-        SELECT * FROM leads 
-        WHERE status = 'active' 
-        AND sequence_step > 0 
+        SELECT * FROM leads
+        WHERE status = 'active'
+        AND sequence_step > 0
         AND sequence_step < 5
         AND last_dm_sent_at IS NOT NULL
         AND datetime(last_dm_sent_at) <= datetime('now', '-{min_days} days')
@@ -90,8 +98,8 @@ def get_newly_connected_leads() -> List[Dict[str, Any]]:
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT * FROM leads 
-        WHERE status = 'connected' 
+        SELECT * FROM leads
+        WHERE status = 'connected'
         AND sequence_step = 0
     """)
     rows = cursor.fetchall()
@@ -120,22 +128,20 @@ def send_dm(lead: Dict[str, Any], step: int) -> bool:
         return False
 
     try:
-        from playwright.sync_api import sync_playwright
-        import json
-        import os
-        import time
+        from pathlib import Path
 
-        session_cookie = os.getenv("LINKEDIN_SESSION_COOKIE")
+        from playwright.sync_api import sync_playwright
+
+        state_dir = str(Path(__file__).parent.parent.parent.parent / "data" / "browser_state")
 
         playwright = sync_playwright().start()
-        context, browser = get_stealth_context(
-            playwright, headless=True, session_cookie=session_cookie
+        context, page = get_persistent_context(
+            playwright, state_dir=state_dir, headless=False
         )
-        page = create_stealth_page(context)
 
         if not safe_goto(page, linkedin_url, timeout=60000):
             logger.print_text(f"[DM] Failed to navigate to {linkedin_url}")
-            browser.close()
+            context.close()
             playwright.stop()
             return False
 
@@ -144,7 +150,7 @@ def send_dm(lead: Dict[str, Any], step: int) -> bool:
         challenge = check_for_challenge(page)
         if challenge:
             logger.print_text(f"[DM] Challenge detected: {challenge}")
-            browser.close()
+            context.close()
             playwright.stop()
             return False
 
@@ -159,7 +165,7 @@ def send_dm(lead: Dict[str, Any], step: int) -> bool:
             logger.print_text(
                 f"[DM] No Message button for {lead.get('name')} — maybe not connected?"
             )
-            browser.close()
+            context.close()
             playwright.stop()
             return False
 
@@ -170,7 +176,7 @@ def send_dm(lead: Dict[str, Any], step: int) -> bool:
         msg_box = page.query_selector('div[role="textbox"]')
         if not msg_box:
             logger.print_text(f"[DM] Could not find message box for {lead.get('name')}")
-            browser.close()
+            context.close()
             playwright.stop()
             return False
 
@@ -181,7 +187,7 @@ def send_dm(lead: Dict[str, Any], step: int) -> bool:
         page.keyboard.press("Enter")
 
         page.wait_for_timeout(random.randint(1000, 2000))
-        browser.close()
+        context.close()
         playwright.stop()
 
         logger.print_text(f"[DM] Sent Step {step} to {lead.get('name')}")
@@ -232,7 +238,7 @@ def run_sequence_step():
         return
 
     if not quiet:
-        logger.print_text(f"\n=== Sequence Step ===")
+        logger.print_text("\n=== Sequence Step ===")
         logger.print_text(f"Leads due for next step: {len(leads)}")
         logger.print_text(f"Rate limit: {dms_per_hour} DMs/hour, {dms_per_day} DMs/day")
 
@@ -241,6 +247,13 @@ def run_sequence_step():
             if not quiet:
                 logger.print_text(f"Rate limit reached ({dms_per_hour}/hour). Stopping.")
             break
+
+        # Idempotency guard: skip if DM already sent today
+        last_dm = lead.get("last_dm_sent_at") or ""
+        if last_dm and last_dm[:10] == datetime.date.today().isoformat():
+            if not quiet:
+                logger.print_text(f"[Skip] {lead.get('name')} — DM already sent today")
+            continue
 
         next_step = lead["sequence_step"] + 1
         if next_step > 5:
@@ -254,10 +267,12 @@ def run_sequence_step():
             if not quiet:
                 logger.print_text(f"Waiting {delay} minutes before next DM...")
 
-        send_dm(lead, next_step)
+        sent = send_dm(lead, next_step)
+        if sent and not is_dry_run():
+            increment_daily_count("dms")
 
     if not quiet:
-        logger.print_text(f"\n=== Sequence Step Complete ===")
+        logger.print_text("\n=== Sequence Step Complete ===")
 
 
 def start_sequence_for_lead(lead_id: int) -> bool:
@@ -297,4 +312,4 @@ def simulate_reply(lead_id: int, reply_type: str = "positive"):
     logger.print_text(f"[SIMULATED] Sequence paused. Status updated to: {new_status}")
 
     if reply_type == "positive":
-        logger.print_text(f"[SIMULATED] Would send booking link...")
+        logger.print_text("[SIMULATED] Would send booking link...")

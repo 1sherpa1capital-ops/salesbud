@@ -3,21 +3,21 @@ LinkedIn Lead Scraper using Playwright
 Real browser automation with dry-run fallback
 """
 
-import salesbud.utils.logger as logger
+import json
 import os
 import re
-import json
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
 from playwright.sync_api import sync_playwright
 
+import salesbud.utils.logger as logger
 from salesbud.database import is_dry_run, log_activity
 from salesbud.models.lead import add_lead
 from salesbud.utils.browser import (
-    get_stealth_context,
-    create_stealth_page,
-    safe_goto,
     check_for_challenge,
+    get_persistent_context,
     random_delay,
+    safe_goto,
 )
 
 # Load environment variables
@@ -75,16 +75,19 @@ def scrape_linkedin_search(
         url = base_url + params
 
         playwright = sync_playwright().start()
-        context, browser = get_stealth_context(
-            playwright, headless=True, session_cookie=LINKEDIN_SESSION_COOKIE
+
+        from pathlib import Path
+        state_dir = str(Path(__file__).parent.parent.parent.parent / "data" / "browser_state")
+
+        context, page = get_persistent_context(
+            playwright, state_dir=state_dir, headless=False
         )
-        page = create_stealth_page(context)
 
         logger.print_text(f"[LinkedIn] Navigating to: {url}")
 
         if not safe_goto(page, url, timeout=60000):
             logger.print_text("[LinkedIn] Failed to navigate to search page")
-            browser.close()
+            context.close()
             playwright.stop()
             return leads
 
@@ -94,7 +97,7 @@ def scrape_linkedin_search(
         challenge = check_for_challenge(page)
         if challenge:
             logger.print_text(f"[LinkedIn] Security challenge detected: {challenge}")
-            browser.close()
+            context.close()
             playwright.stop()
             return []
         # Extract leads from HTML
@@ -104,7 +107,7 @@ def scrape_linkedin_search(
 
         logger.print_text(f"[LinkedIn] Found {len(profile_ids)} unique profiles")
 
-        for profile_id in profile_ids[:max_leads]:
+        for profile_id in profile_ids[:max_leads]: # type: ignore
             try:
                 profile_url = f"https://www.linkedin.com/in/{profile_id}/"
                 name = "Unknown"
@@ -120,8 +123,8 @@ def scrape_linkedin_search(
                 if context_match:
                     anchor_content = context_match.group(1)
                     clean_text = re.sub(r"<[^>]+>", "", anchor_content)
-                    if clean_text.strip():
-                        name = clean_text.strip()[:50]
+                    if isinstance(clean_text, str) and clean_text.strip():
+                        name = clean_text.strip()[:50] # type: ignore
 
                 # Try to find headline
                 headline_match = re.search(
@@ -148,7 +151,7 @@ def scrape_linkedin_search(
                 logger.print_text(f"  [Error] Failed to extract lead: {e}")
                 continue
 
-        browser.close()
+        context.close()
         playwright.stop()
 
     except Exception as e:
@@ -169,18 +172,20 @@ def scrape_leads(query: str, location: Optional[str] = None, max_leads: int = 50
     """Scrape leads from LinkedIn - main entry point."""
     quiet = is_quiet_mode()
     if not quiet:
-        logger.print_text(f"\n=== LinkedIn Lead Scraper ===")
+        logger.print_text("\n=== LinkedIn Lead Scraper ===")
         logger.print_text(f"Query: {query}")
         logger.print_text(f"Location: {location or 'Any'}")
         logger.print_text(f"Max leads: {max_leads}")
 
-    has_creds = bool(LINKEDIN_SESSION_COOKIE or (LINKEDIN_EMAIL and LINKEDIN_PASSWORD))
+    from pathlib import Path
+    state_dir = str(Path(__file__).parent.parent.parent.parent / "data" / "browser_state")
+    has_creds = os.path.exists(state_dir)
 
     if is_dry_run() or not has_creds:
         if is_dry_run() and not quiet:
             logger.print_text("Dry run: True")
         if not has_creds and not quiet:
-            logger.print_text("No LinkedIn credentials - running in demo mode")
+            logger.print_text("No persistent browser state found - run 'salesbud login' first. Running in demo mode")
 
         if not quiet:
             logger.print_text("\n[DRY RUN] Example leads (simulated):")
@@ -218,7 +223,7 @@ def scrape_leads(query: str, location: Optional[str] = None, max_leads: int = 50
             },
         ]
 
-        for lead in sample_leads[:max_leads]:
+        for lead in sample_leads[:max_leads]: # type: ignore
             linkedin_url = f"https://www.linkedin.com/in/{lead['name'].lower().replace(' ', '-')}"
             lead_id = add_lead(
                 linkedin_url=linkedin_url,
@@ -231,7 +236,7 @@ def scrape_leads(query: str, location: Optional[str] = None, max_leads: int = 50
                 logger.print_text(f"  - Added: {lead['name']}")
             log_activity(lead_id, "lead_added", f"Scraped: {lead['name']} at {lead['company']}")
 
-        return len(sample_leads[:max_leads])
+        return len(sample_leads[:max_leads]) # type: ignore
 
     # Real scraping
     if not quiet:
@@ -257,8 +262,8 @@ def get_scraper_status() -> Dict[str, int]:
 
     leads = get_all_leads()
     total = len(leads)
-    new_count = sum(1 for l in leads if l["status"] == "new")
-    active_count = sum(1 for l in leads if l["status"] == "active")
-    completed = sum(1 for l in leads if l["status"] in ("completed", "booked"))
+    new_count = sum(1 for lead in leads if lead["status"] == "new")
+    active_count = sum(1 for lead in leads if lead["status"] == "active")
+    completed = sum(1 for lead in leads if lead["status"] in ("completed", "booked"))
 
     return {"total": total, "new": new_count, "active": active_count, "completed": completed}

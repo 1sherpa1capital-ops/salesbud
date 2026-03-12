@@ -3,7 +3,8 @@ Lead model and CRUD operations
 """
 
 import sqlite3
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
+
 from salesbud.database import get_db
 
 
@@ -177,6 +178,30 @@ def update_lead_company_url(lead_id: int, company_url: str):
     cursor.execute(
         "UPDATE leads SET company_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         (company_url, lead_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def update_lead_research(lead_id: int, research_data: str):
+    """Set or update the agent-browser research dump for a lead."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE leads SET company_research = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (research_data, lead_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def update_lead_personalization(lead_id: int, personalization: str):
+    """Set or update the personalized icebreaker for a lead."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE leads SET personalization_angle = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (personalization, lead_id),
     )
     conn.commit()
     conn.close()

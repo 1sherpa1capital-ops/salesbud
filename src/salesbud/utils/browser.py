@@ -3,11 +3,12 @@ Browser Stealth Utilities for Playwright
 Hides automation signatures and provides human-like behavior
 """
 
+import json
 import random
 import time
-import json
-from typing import Optional, Dict, Any, List, Tuple, cast
-from playwright.sync_api import BrowserContext, Page, Playwright, Browser, ViewportSize
+from typing import Optional, Tuple, cast
+
+from playwright.sync_api import Browser, BrowserContext, Page, Playwright, ViewportSize
 
 STEALTH_SCRIPT = """
 Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
@@ -77,6 +78,32 @@ def get_stealth_context(
     return context, browser
 
 
+def get_persistent_context(
+    playwright: Playwright,
+    state_dir: str,
+    headless: bool = True,
+) -> Tuple[BrowserContext, Page]:
+    args = [
+        "--disable-blink-features=AutomationControlled",
+        "--disable-dev-shm-usage",
+        "--no-sandbox",
+    ]
+
+    context = playwright.chromium.launch_persistent_context(
+        user_data_dir=state_dir,
+        headless=headless,
+        args=args,
+        viewport=cast(ViewportSize, random.choice(VIEWPORT_SIZES)),
+        user_agent=random.choice(USER_AGENTS),
+        locale="en-US",
+        timezone_id="America/New_York",
+    )
+
+    page = context.pages[0] if context.pages else context.new_page()
+    page.add_init_script(STEALTH_SCRIPT)
+    return context, page
+
+
 def create_stealth_page(context: BrowserContext) -> Page:
     page = context.new_page()
     page.add_init_script(STEALTH_SCRIPT)
@@ -90,6 +117,7 @@ def safe_goto(page: Page, url: str, timeout: int = 60000, retries: int = 2) -> b
             page.wait_for_timeout(random_delay(1000, 2000))
             return True
         except Exception as e:
+            print(f"[Stealth Browser] safe_goto exception: {e}")
             if "ERR_TOO_MANY_REDIRECTS" in str(e) and attempt < retries - 1:
                 page.wait_for_timeout(random_delay(3000, 5000))
                 continue
@@ -99,15 +127,47 @@ def safe_goto(page: Page, url: str, timeout: int = 60000, retries: int = 2) -> b
     return False
 
 
-def check_for_challenge(page: Page) -> Optional[str]:
+def check_for_challenge(page: Page, wait_for_user: bool = True) -> Optional[str]:
     url = page.url.lower()
-    content = page.content().lower()
+    try:
+        content = page.content().lower()
+    except Exception:
+        content = ""
 
     indicators = ["captcha", "challenge", "security check", "verify you're human"]
+    detected = None
     for indicator in indicators:
         if indicator in url or indicator in content:
-            return indicator
-    return None
+            detected = indicator
+            break
+
+    if detected and wait_for_user:
+        print(f"\\n[Stealth Browser] Challenge detected: '{detected}'.")
+        print("Please solve it manually in the browser window within 60 seconds.")
+
+        import time
+        max_wait = 60
+        start_time = time.time()
+        while time.time() - start_time < max_wait:
+            time.sleep(2)
+            try:
+                c = page.content().lower()
+                u = page.url.lower()
+            except Exception:
+                continue
+            still_there = False
+            for indicator in indicators:
+                if indicator in u or indicator in c:
+                    still_there = True
+                    break
+            if not still_there:
+                print("[Stealth Browser] Challenge solved! Proceeding...")
+                page.wait_for_timeout(2000)
+                return None
+
+        print("[Stealth Browser] Timed out waiting for challenge resolution.")
+
+    return detected
 
 
 def human_like_click(page: Page, selector: str):

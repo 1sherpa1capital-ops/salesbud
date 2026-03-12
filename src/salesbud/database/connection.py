@@ -1,15 +1,14 @@
 """
-Database configuration and utilities
+Database configuration and connection utilities
 """
 
-import salesbud.utils.logger as logger
-import os
 import sqlite3
 from pathlib import Path
 from typing import Optional
 
-# Database path - store in data/ directory
-DB_PATH = Path(__file__).parent.parent.parent / "data" / "salesbud.db"
+from salesbud.utils import logger
+
+DB_PATH = Path(__file__).parent.parent.parent.parent / "data" / "salesbud.db"
 DB_PATH.parent.mkdir(exist_ok=True)
 
 
@@ -30,7 +29,6 @@ def init_db():
     conn = get_db()
     cursor = conn.cursor()
 
-    # Leads table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS leads (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,7 +50,6 @@ def init_db():
         )
     """)
 
-    # Add email columns if they don't exist (for existing databases)
     for col, col_type, default in [
         ("email", "TEXT", None),
         ("email_sequence_step", "INTEGER", "0"),
@@ -64,9 +61,8 @@ def init_db():
             else:
                 cursor.execute(f"ALTER TABLE leads ADD COLUMN {col} {col_type}")
         except sqlite3.OperationalError:
-            pass  # Column already exists
+            pass
 
-    # Add enrichment columns if they don't exist (for existing databases)
     for col, col_type, default in [
         ("company_url", "TEXT", None),
         ("company_description", "TEXT", None),
@@ -75,6 +71,8 @@ def init_db():
         ("enriched_at", "TEXT", None),
         ("email_source", "TEXT", None),
         ("email_verified", "INTEGER", "0"),
+        ("company_research", "TEXT", None),
+        ("personalization_angle", "TEXT", None),
     ]:
         try:
             if default is not None:
@@ -82,9 +80,8 @@ def init_db():
             else:
                 cursor.execute(f"ALTER TABLE leads ADD COLUMN {col} {col_type}")
         except sqlite3.OperationalError:
-            pass  # Column already exists
+            pass
 
-    # Activity log
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS activities (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,7 +92,6 @@ def init_db():
         )
     """)
 
-    # Config
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS config (
             key TEXT PRIMARY KEY,
@@ -103,7 +99,6 @@ def init_db():
         )
     """)
 
-    # Default config
     cursor.execute("INSERT OR IGNORE INTO config (key, value) VALUES ('dry_run', '1')")
     cursor.execute("INSERT OR IGNORE INTO config (key, value) VALUES ('dms_per_hour', '8')")
     cursor.execute("INSERT OR IGNORE INTO config (key, value) VALUES ('dms_per_day', '50')")
@@ -138,8 +133,14 @@ def set_config(key: str, value: str):
     conn.close()
 
 
+# Override flag - set to True by CLI --dry-run to temporarily force dry_run behavior
+_dry_run_override: bool = False
+
+
 def is_dry_run() -> bool:
     """Check if running in dry-run mode."""
+    if _dry_run_override:
+        return True
     return get_config("dry_run") == "1"
 
 
@@ -153,3 +154,31 @@ def log_activity(lead_id: int, activity_type: str, content: str):
     )
     conn.commit()
     conn.close()
+
+
+def get_daily_count(action: str) -> int:
+    """Return today's count for an action type ('connections', 'emails').
+    Resets automatically when the stored date differs from today."""
+    from datetime import date
+
+    today = str(date.today())
+    date_key = f"{action}_sent_date"
+    count_key = f"{action}_sent_today"
+
+    stored_date = get_config(date_key)
+    if stored_date != today:
+        # New day — reset
+        set_config(date_key, today)
+        set_config(count_key, "0")
+        return 0
+
+    val = get_config(count_key)
+    return int(val) if val and val.isdigit() else 0
+
+
+def increment_daily_count(action: str) -> int:
+    """Increment today's count for an action and return the new value."""
+    current = get_daily_count(action)
+    new_val = current + 1
+    set_config(f"{action}_sent_today", str(new_val))
+    return new_val

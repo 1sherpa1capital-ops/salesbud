@@ -4,16 +4,13 @@ Email discovery and verification service
 
 import re
 import socket
-import dns.resolver
-from typing import Optional, List
-from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional
 
+import dns.resolver
 import requests
-from bs4 import BeautifulSoup
 
 from salesbud.database import get_db
-from salesbud.models.lead import get_lead_by_id, get_all_leads, update_lead_email
 
 SKIP_VERIFY_DOMAINS = {"gmail.com", "outlook.com", "hotmail.com", "yahoo.com", "icloud.com"}
 
@@ -73,7 +70,7 @@ def verify_smtp(email: str, timeout: int = 10) -> bool:
 
             response = sock.recv(1024).decode("utf-8", errors="ignore")
 
-            sock.send(f"MAIL FROM:<verify@example.com>\r\n".encode())
+            sock.send("MAIL FROM:<verify@example.com>\r\n".encode())
             sock.recv(1024)
 
             sock.send(f"RCPT TO:<{email}>\r\n".encode())

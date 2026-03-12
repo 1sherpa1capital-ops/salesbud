@@ -42,6 +42,12 @@ uv run python -m salesbud config
 uv run python -m salesbud config dry_run 0
 ```
 
+## What's New in v1.3
+
+- 🛡️ **Production Readiness** - Pydantic validation, DB-backed daily rate limits, and idempotency guards.
+- ✅ **Pre-Flight Validation** - Run `uv run python scripts/prod_check.py` to verify system health before going live.
+- 🐍 **Modern Python** - Project requirement bumped to Python 3.13+ with the latest stable dependencies.
+
 ## What's New in v1.2
 
 - 🕵️ **Browser Stealth System** - Anti-detection measures for LinkedIn automation
@@ -52,7 +58,7 @@ uv run python -m salesbud config dry_run 0
 
 ## Status
 
-✅ **v1.2** — LinkedIn DMs + Cold Email + Enrichment + Stealth (dry-run mode)
+✅ **v1.3** — Prod-ready with input validation, rate limits, and full stealth.
 
 ## Docs
 

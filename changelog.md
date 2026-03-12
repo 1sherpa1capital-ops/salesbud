@@ -10,13 +10,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Zero-Config Search**: Added `icp.json` file parsing capability to the `scrape` and `workflow` commands. If you run those commands without passing the `--query` or `--location` arguments, they will now automatically look for an `icp.json` payload in the root directory.
+- **Persistent Auth**: Created a dedicated `login` command which launches a headed browser for the user to log into LinkedIn manually (solving 2FA headers/emails). State is cleanly saved to `./data/browser_state`, entirely replacing the unstable `.env` cookie pasting workflow.
 - **Landing Page & Docs UI**: Built a complete minimalist, Monokai-themed landing page (`website/`) for SalesBud CLI. Features include binary code rain background, Geist typography, a headless SVG ghost-bot logo, and comprehensive agent-first product positioning.
 - **Rich CLI TUI**: Integrated `rich` to provide beautiful panels, tables, and colors for human operators navigating the CLI (Mode A operation).
 - **Centralized Logger**: Added `logger.py` to route all stdout, ensuring 100% strict JSON output suppression for headless AI agents (Mode B operation).
+- **Agent Browser Integration**: Added `agent-browser` driven company website research and personalization pipeline. Added new columns (`company_research`, `personalization_angle`) to leads. Included `research` and `personalize` commands to the CLI. Outbound DMs and Connection notes now automatically use generated contextual personalization angles.
 
 ### Changed
+- **TOON Format Migration**: Migrated all machine-readable CLI output from JSON to TOON (Token-Oriented Object Notation) format. TOON is optimized for AI agents, reducing token usage while remaining easily parsable. All `--json` flags are now `--toon`, and the `print_json()` utility has been replaced with `print_toon()`.
+- **Anti-Bot Bypass**: Modified all scraping/automations (scraper, connector, dm sequences, inbox check) to run with `headless=False` (visible browser). This drastically reduces LinkedIn's bot challenge surface and allows human-in-the-loop interventions.
+- **Challenge Bypass**: Refactored `check_for_challenge()` in `browser.py` to pause for 60 seconds whenever LinkedIn shows a Captcha wall, allowing the user to manually solve the Captcha in the browser window instead of crashing immediately.
 - Refactored `src/salesbud/cli/dashboard.py` to use `rich.table.Table` and `rich.panel.Panel` for stunning visual presentation of leads and stats.
 - Replaced >250 raw `print()` statements across all inner scraper/emailer services, actively preventing JSON parsing errors for LLM agents.
+
+### Fixed
+- **Connection Logic Locators**: Completely refactored `connector.py` to strictly scope the "Connect" button lookup to the `main section` (top card) of a profile. This prevents the bot from accidentally navigating to and clicking on profiles in the "People also viewed" sidebar.
+- **Hidden Connection Actions**: `connector.py` now correctly clicks the "More actions" dropdown to find the "Connect" or "Message" button if it is hidden from the main profile row, dramatically increasing the connect rate on customized profiles.
+- **Empty Connect Handling**: The connector module safely handles profiles where the user strictly blocks connection requests, logging the warning rather than failing or clicking an invalid element.
+- **Orphaned Contexts**: Added strictly scoped `finally:` blocks to Playwright execution in the connection commands to ensure the browser context is reliably closed even if a DOM element exception is thrown, preventing memory leaks and stalled zombie processes.
+
+---
+
+## [1.3.0] - 2026-03-11
+
+### Added
+- **Production Readiness Check**: New `scripts/prod_check.py` to validate Python version, env vars, DB state, and rate limits before dropping dry-run mode.
+- **Input Validation**: `pydantic v2` implemented across all CLI data entry points (`add-email`, `email`, `set-company-url`, etc.) returning clean JSON errors.
+- **Daily Rate Limiting**: Centralized SQLite counters for `dms_per_day` and `emails_per_day` with enforced guards in `connector.py` and `emailer.py`.
+- **Idempotency Guards**: `sequence.py` now blocks duplicate DMs sent to the same lead on the same day.
+
+### Changed
+- **Dependencies**: Required Python version bumped to `^3.13`. All `uv` dependencies upgraded to their latest stable releases.
+- **Clean Exceptions**: Top-level `try/except` block in `main.py` catches all unhandled exceptions and formats them as proper JSON for AI operator consumption.
+- **Docs**: Comprehensive newly updated `SKILL.md` for `salesbud-cli`.
 
 ---
 
@@ -127,6 +154,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unified dashboard
 - Dry-run mode for safe testing
 
-[Unreleased]: https://github.com/syntolabs/salesbud/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/syntolabs/salesbud/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/syntolabs/salesbud/releases/tag/v1.3.0
+[1.2.0]: https://github.com/syntolabs/salesbud/releases/tag/v1.2.0
 [1.1.0]: https://github.com/syntolabs/salesbud/releases/tag/v1.1.0
 [1.0.0]: https://github.com/syntolabs/salesbud/releases/tag/v1.0.0

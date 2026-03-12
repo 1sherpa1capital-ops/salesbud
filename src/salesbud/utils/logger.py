@@ -3,7 +3,8 @@ Minimalist logger for SalesBud CLI.
 Clean, simple output with minimal visual noise.
 """
 
-from typing import Any, Optional
+from typing import Any
+
 from rich.console import Console
 
 console = Console()

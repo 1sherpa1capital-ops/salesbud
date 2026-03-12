@@ -1,6 +1,6 @@
 # SalesBud — Specification
 
-**Version:** 1.1 | **Date:** March 10, 2026 | **Status:** Live — Dry-Run Verified
+**Version:** 1.3.0 | **Date:** March 11, 2026 | **Status:** Live — Production Ready
 
 ---
 
@@ -20,6 +20,7 @@ SalesBud is a **Python CLI** that automates two-channel outbound sales developme
 - ✅ Unified dashboard (DM step + Email step per lead)
 - ✅ Dry-run mode for both channels (default on)
 - ✅ `add-email` to manually assign email addresses
+- ✅ **Production Hardened (v1.3.0):** Pydantic validation, DB-backed daily rate limits, retry logic, global JSON error handler, and idempotency guards.
 
 ---
 
@@ -163,6 +164,8 @@ CREATE TABLE config (
 | `set_config(key, value)` | Write config value |
 | `is_dry_run()` | Returns `True` if `dry_run == "1"` |
 | `log_activity(lead_id, type, content)` | Insert activity log row |
+| `get_daily_count(action_type)` | Retrieve daily action counter |
+| `increment_daily_count(action)` | Increment the daily action counter |
 
 ### `models/lead.py` — Lead CRUD
 
@@ -180,7 +183,7 @@ CREATE TABLE config (
 
 ### `services/scraper.py` — LinkedIn Scraper
 
-**Auth:** `LINKEDIN_SESSION_COOKIE` (JSON `li_at` cookie) → fallback to email/password.
+**Auth:** Persistent browser state loaded from `./data/browser_state`. Initiate by running `uv run python -m salesbud login`.
 
 **Flow:**
 1. Launch headless Chromium, inject session cookie
@@ -196,9 +199,11 @@ CREATE TABLE config (
 
 **Flow:**
 1. Get `new` leads up to `max_requests`
-2. Navigate to profile → find Connect button (3 CSS selector attempts)
+2. Navigate to profile → find Connect button 
+   - Strict scoping to `main section` (top card) to avoid sidebar profiles
+   - Fallback to clicking "More" to find hidden Connect options
 3. Click Connect → Add a Note → fill note template → Send
-4. Update status to `connection_requested`
+4. Update status to `connection_requested` (aborts cleanly if no button found)
 
 **Check flow:** Visits profile → Message button = connected, Pending = still waiting, Connect = declined.
 
@@ -241,15 +246,15 @@ CREATE TABLE config (
 
 ## 7. Authentication
 
-| Method | Env Var | Priority |
+| Method | Configuration | Priority |
 |--------|---------|----------|
-| LinkedIn session cookie | `LINKEDIN_SESSION_COOKIE` (JSON `li_at` array) | Primary |
+| Persistent Browser State | `./data/browser_state` cache (via `login` command) | Primary |
 | LinkedIn credentials | `LINKEDIN_EMAIL` + `LINKEDIN_PASSWORD` | Fallback |
 | Resend | `RESEND_API_KEY` | Required for email |
 | Sender address | `RESEND_FROM_EMAIL` | e.g. `Rhigden <rhigden@syntolabs.xyz>` |
 
 > [!WARNING]
-> LinkedIn session cookies expire in ~24 hours. Refresh `LINKEDIN_SESSION_COOKIE` in `.env` daily when running live.
+> LinkedIn sessions expire. If you hit a login wall or 0 leads, run `uv run python -m salesbud login` to authenticate and save session state.
 
 ---
 
@@ -270,7 +275,7 @@ When `dry_run = 1` (default):
 
 ## 9. Rate Limiting & Error Handling
 
-**Rate limits:**
+**Rate limits:** (Enforced strictly via `get_daily_count` and `increment_daily_count` in the database to prevent abuse across CLI runs).
 
 | Channel | Limit |
 |---------|-------|
@@ -290,6 +295,8 @@ When `dry_run = 1` (default):
 | Playwright timeout | 60s page load, 30s DOM |
 | Invalid session cookie JSON | Falls back to credentials |
 | Database locked | SQLite default retry |
+| Input Validation Failure | Caught by Pydantic models, JSON error returned |
+| Unhandled Exceptions | Caught by top-level `main.py` try/except, JSON error returned |
 
 ---
 

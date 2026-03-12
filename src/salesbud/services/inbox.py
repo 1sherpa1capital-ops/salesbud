@@ -2,12 +2,12 @@
 Scan LinkedIn inbox for new replies from leads in our sequences.
 """
 
-import salesbud.utils.logger as logger
-import os
-import json
 import random
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 from playwright.sync_api import sync_playwright
+
+import salesbud.utils.logger as logger
 
 
 def check_linkedin_inbox() -> List[Dict[str, Any]]:
@@ -16,8 +16,8 @@ def check_linkedin_inbox() -> List[Dict[str, Any]]:
     For each thread, check if the sender is one of our tracked leads.
     Return list of {"lead_id": int, "name": str, "message": str, "detected_intent": str}
     """
-    from salesbud.models.lead import get_all_leads, update_lead_status
     from salesbud.database import log_activity
+    from salesbud.models.lead import get_all_leads, update_lead_status
 
     replies_found = []
 
@@ -34,33 +34,15 @@ def check_linkedin_inbox() -> List[Dict[str, Any]]:
         logger.print_text("[Inbox] No active leads to check replies for.")
         return []
 
-    session_cookie = os.getenv("LINKEDIN_SESSION_COOKIE")
+    from pathlib import Path
+    state_dir = str(Path(__file__).parent.parent.parent.parent / "data" / "browser_state")
 
     try:
+        from salesbud.utils.browser import get_persistent_context
         playwright = sync_playwright().start()
-        browser = playwright.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
+        context, page = get_persistent_context(
+            playwright, state_dir=state_dir, headless=False
         )
-
-        if session_cookie:
-            try:
-                context.add_cookies(json.loads(session_cookie))
-            except Exception as e:
-                logger.print_text(f"[Inbox] Could not parse session cookie: {e}")
-                browser.close()
-                playwright.stop()
-                return []
-        else:
-            logger.print_text("[Inbox] No LINKEDIN_SESSION_COOKIE set — cannot check inbox.")
-            browser.close()
-            playwright.stop()
-            return []
-
-        page = context.new_page()
 
         logger.print_text("[Inbox] Navigating to LinkedIn messaging...")
         page.goto("https://www.linkedin.com/messaging/", timeout=60000)
@@ -69,8 +51,10 @@ def check_linkedin_inbox() -> List[Dict[str, Any]]:
 
         # Check if we're actually logged in (redirect to login = session expired)
         if "login" in page.url or "authwall" in page.url:
-            logger.print_text("[Inbox] LinkedIn session expired. Refresh LINKEDIN_SESSION_COOKIE in .env")
-            browser.close()
+            logger.print_text(
+                "[Inbox] LinkedIn session expired. Run 'salesbud login' to re-authenticate."
+            )
+            context.close()
             playwright.stop()
             return []
 
@@ -151,11 +135,11 @@ def check_linkedin_inbox() -> List[Dict[str, Any]]:
                     }
                 )
 
-            except Exception as e:
+            except Exception:
                 # Don't let one thread error kill the whole scan
                 continue
 
-        browser.close()
+        context.close()
         playwright.stop()
 
     except Exception as e:
@@ -165,7 +149,9 @@ def check_linkedin_inbox() -> List[Dict[str, Any]]:
         traceback.print_exc()
 
     if replies_found:
-        logger.print_text(f"[Inbox] Found {len(replies_found)} replies. Sequences paused for those leads.")
+        logger.print_text(
+            f"[Inbox] Found {len(replies_found)} replies. Sequences paused for those leads."
+        )
     else:
         logger.print_text("[Inbox] No new replies found.")
 

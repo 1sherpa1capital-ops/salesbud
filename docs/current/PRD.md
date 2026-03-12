@@ -1,8 +1,8 @@
 # SalesBud — Product Requirements Document
 
-**Version:** 2.0 (Planning)
-**Date:** March 10, 2026
-**Status:** Active Development — v1.1 base exists, v2.0 gaps identified
+**Version:** 2.0 (Rolling out / v1.3.0 Live)
+**Date:** March 11, 2026
+**Status:** Active Development — v1.3.0 base exists (production hardened), v2.0 gaps identified
 **Philosophy:** Build a rock-solid CLI. Let AI agents (OpenCode / Claude Code) be the UI.
 
 ---
@@ -41,6 +41,7 @@ python -m salesbud workflow --query "CEO" --location "Austin" --max-leads 20
 | Unified CLI dashboard | ✅ Working |
 | Dry-run mode | ✅ Working |
 | Manual `add-email` | ✅ Working |
+| Production Hardening (Pydantic, Limits, Idempotency) | ✅ Working (v1.3.0) |
 
 ---
 
@@ -114,6 +115,7 @@ These require user action to complete:
 | No `status/cron/digest/find-email/enrich/check-replies` commands | Missing Mode B surface |
 | No `AGENTS.md` — AI agent has no CLI reference | AI must guess commands |
 | Location search uses hardcoded US geoUrn | International searches broken |
+| No parameterless search | CLI forces explicit long `--query` | AI must guess ICP |
 
 ---
 
@@ -131,6 +133,7 @@ OpenCode or Claude Code reads `AGENTS.md`, understands the CLI, and operates Sal
 - Idempotent commands (safe to re-run)
 - A `status` command the AI can poll
 - An `AGENTS.md` at the repo root with the full CLI reference
+- A local `icp.json` definition for zero-config searching
 
 **The agent-browser + SalesBud CLI combo for email discovery:**
 ```bash
@@ -161,8 +164,8 @@ agent-browser --version
 ```
 
 > [!WARNING]
-> **LinkedIn Session Risk:** Session cookies (`li_at`) expire in approximately 24 hours. Beyond expiry, all LinkedIn operations silently fail or redirect to login. Mitigations required:
-> - Refresh `LINKEDIN_SESSION_COOKIE` in `.env` daily before running
+> **LinkedIn Session Risk:** Sessions expire if not kept active. Beyond expiry, all LinkedIn operations silently fail or redirect to login. Mitigations required:
+> - Run `uv run python -m salesbud login` to launch a browser, map the session, and save it to `./data/browser_state` before running campaigns.
 > - Add jitter to all Playwright timing: use `page.wait_for_timeout(random.randint(2000, 5000))` not fixed waits
 > - Randomize delays between actions: currently `connector.py` uses fixed `time.sleep(delay_seconds)` — should use `delay_seconds + random.randint(-10, 30)`
 > - Add explicit login-state check before each Playwright session and abort with clear error if not authenticated
@@ -270,8 +273,8 @@ def verify_smtp(email: str) -> bool:
 | Phase 5 | Railway / local scheduling | ⚪ DEFERRED | Use launchd/cron manually |
 | v1.1 | Real LinkedIn DM send (production) | ✅ DONE | Playwright in send_dm() |
 | v1.1 | Location-aware scraping | ✅ DONE | Keywords include location |
-| v1.1 | LinkedIn scraping | ✅ DONE | Full Playwright implementation |
-| v1.1 | Connection requests | ✅ DONE | Full Playwright implementation |
+| v1.1 | LinkedIn scraping | ✅ DONE | Full Playwright implementation + Stealth |
+| v1.1 | Connection requests | ✅ DONE | Full Playwright implementation (Handles missing Connect buttons strictly, avoids sidebars) |
 | v1.1 | 5-step DM sequence (logic) | ✅ DONE | Dry-run + production |
 | v1.1 | 4-step email via Resend | ✅ DONE | Full implementation |
 | v1.1 | Unified dashboard | ✅ DONE | DM + Email columns |
@@ -298,6 +301,7 @@ These are low-effort, high-leverage changes. **Mode B is impossible without them
 | `status` command | `python -m salesbud status` | DB counts, rate limit state, dry_run, mode |
 | Structured exit codes | All commands | 0=ok, 1=error, 2=rate-limited, 3=nothing to process |
 | `--quiet` flag | All commands | Suppress human-readable output for scripting |
+| `icp.json` parsing | `scrape`, `workflow` | Load `--query`/`--location` from `icp.json` if omitted |
 | Fix real DM send | `sequence` | Add Playwright messaging code to `send_dm()` |
 
 ### Phase 2 — Email Discovery (Week 1-2)
@@ -352,6 +356,7 @@ email, email-sequence, add-email, workflow, dashboard, lead, reply, config, test
 <any command> --json         # {"success": bool, "count": int, "data": [...]}
 <any command> --quiet        # Suppress output for scripting
 status                       # System health JSON
+scrape                       # Uses local icp.json if query/location omitted
 
 # Email discovery (Phase 2)
 find-email <id>              # browser-use + SMTP verify for one lead
@@ -384,7 +389,9 @@ python -m salesbud status --json
 ### Discover current state:
 python -m salesbud dashboard --json
 
-### Find leads:
+### Find leads (reads --query/--location from icp.json if omitted):
+python -m salesbud scrape --json
+# Or specify explicitly:
 python -m salesbud scrape --query "CEO" --location "Austin" --max 20 --json
 
 ### Discover emails (for leads without email):
@@ -498,6 +505,9 @@ ALTER TABLE leads ADD COLUMN enriched_at TEXT;
 ### Pre-Flight Verification Commands
 
 ```bash
+# 0. Production readiness check
+uv run python scripts/prod_check.py
+
 # 1. Initialize database (or migrate)
 python -m salesbud init
 python -m salesbud init --json
@@ -532,8 +542,8 @@ python -m salesbud email-sequence --json
    python -m salesbud config dry_run 0
    ```
 
-2. **Refresh LinkedIn session cookie:**
-   - Copy fresh `li_at` from browser DevTools → `.env` as `LINKEDIN_SESSION_COOKIE`
+2. **Authenticate with LinkedIn:**
+   - Run `uv run python -m salesbud login` to open a headed browser and store your credentials session natively.
 
 3. **Live email test (use Resend safe address):**
    ```bash

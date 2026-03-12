@@ -2,10 +2,11 @@
 Company enrichment service using Crawl4AI
 """
 
-import salesbud.utils.logger as logger
 import asyncio
-from typing import Dict, Any, Optional
 from datetime import datetime
+from typing import Any, Dict, Optional
+
+import salesbud.utils.logger as logger
 
 
 async def enrich_company(company_url: str) -> Dict[str, Any]:
@@ -105,14 +106,12 @@ def _extract_hiring_signals(html: str) -> Optional[str]:
 
 def enrich_lead(lead_id: int) -> bool:
     """Enrich a single lead. Returns True if data was found."""
-    from salesbud.models.lead import get_lead_by_id
     from salesbud.database import get_db
+    from salesbud.models.lead import get_lead_by_id
 
     lead = get_lead_by_id(lead_id)
     if not lead:
         return False
-
-    company = lead.get("company")
     company_url = lead.get("company_url")
 
     if not company_url:

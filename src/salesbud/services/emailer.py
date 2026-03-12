@@ -3,13 +3,20 @@ Cold Email Sequence Engine via Resend
 4-step cold email sequence from Synto Labs sales playbook
 """
 
-import salesbud.utils.logger as logger
 import os
-import time
 import random
-from typing import Dict, Any, Optional
+import time
+from typing import Any, Dict
 
-from salesbud.database import is_dry_run, log_activity, get_db, get_config
+import salesbud.utils.logger as logger
+from salesbud.database import (
+    get_config,
+    get_daily_count,
+    get_db,
+    increment_daily_count,
+    is_dry_run,
+    log_activity,
+)
 from salesbud.models.lead import get_lead_by_id, update_lead_email_sent
 
 # Load environment variables
@@ -132,7 +139,7 @@ EMAIL_STEP_DELAYS = {
 def send_email(to: str, subject: str, html: str, text: str = "") -> bool:
     """Send a single email via Resend API (or log in dry-run mode)."""
     if is_dry_run():
-        logger.print_text(f"\n[DRY RUN] Would send email:")
+        logger.print_text("\n[DRY RUN] Would send email:")
         logger.print_text(f"  From: {RESEND_FROM_EMAIL}")
         logger.print_text(f"  To: {to}")
         logger.print_text(f"  Subject: {subject}")
@@ -202,7 +209,9 @@ def send_cold_email(lead: Dict[str, Any], step: int) -> bool:
     email = lead.get("email")
 
     if not email:
-        logger.print_text(f"[Email] No email address for lead {lead.get('name', 'Unknown')} — skipping")
+        logger.print_text(
+            f"[Email] No email address for lead {lead.get('name', 'Unknown')} — skipping"
+        )
         return False
 
     if is_dry_run():
@@ -234,8 +243,8 @@ def get_leads_due_for_email(min_days: int = 3) -> list:
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(f"""
-        SELECT * FROM leads 
-        WHERE email IS NOT NULL 
+        SELECT * FROM leads
+        WHERE email IS NOT NULL
         AND email != ''
         AND email_sequence_step > 0
         AND email_sequence_step < 4
@@ -253,8 +262,8 @@ def get_leads_ready_for_email_start() -> list:
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT * FROM leads 
-        WHERE email IS NOT NULL 
+        SELECT * FROM leads
+        WHERE email IS NOT NULL
         AND email != ''
         AND email_sequence_step = 0
         AND status NOT IN ('replied', 'booked', 'paused', 'completed')
@@ -287,13 +296,27 @@ def run_email_sequence_step():
     """Run one step of the email sequence for all eligible leads."""
     quiet = is_quiet_mode()
     emails_per_hour = int(get_config("emails_per_hour") or 10)
+    emails_per_day = int(get_config("emails_per_day") or 50)
     email_delay = int(get_config("email_delay_minutes") or 2)
+
+    # Daily rate limit guard
+    if not is_dry_run():
+        sent_today = get_daily_count("emails")
+        if sent_today >= emails_per_day:
+            if not quiet:
+                logger.print_text(
+                    f"⛔ Daily email limit reached ({sent_today}/{emails_per_day}). Stopping."
+                )
+            return
+        emails_per_hour = min(emails_per_hour, emails_per_day - sent_today)
 
     # First, start sequences for leads with emails who haven't started yet
     new_leads = get_leads_ready_for_email_start()
     if new_leads:
         if not quiet:
-            logger.print_text(f"\n[Email Sequence] Starting sequences for {len(new_leads)} leads with emails")
+            logger.print_text(
+                f"\n[Email Sequence] Starting sequences for {len(new_leads)} leads with emails"
+            )
         for lead in new_leads[:emails_per_hour]:
             start_email_sequence_for_lead(lead["id"])
         return
@@ -305,7 +328,7 @@ def run_email_sequence_step():
     all_due = []
     for current_step, delay in step_delays.items():
         leads = get_leads_due_for_email(min_days=delay)
-        due_for_step = [l for l in leads if l["email_sequence_step"] == current_step]
+        due_for_step = [lead for lead in leads if lead["email_sequence_step"] == current_step]
         all_due.extend(due_for_step)
 
     if not all_due:
@@ -314,7 +337,7 @@ def run_email_sequence_step():
         return
 
     if not quiet:
-        logger.print_text(f"\n=== Email Sequence Step ===")
+        logger.print_text("\n=== Email Sequence Step ===")
         logger.print_text(f"Leads due for next step: {len(all_due)}")
         logger.print_text(f"Rate limit: {emails_per_hour} emails/hour")
 
@@ -336,7 +359,9 @@ def run_email_sequence_step():
                 logger.print_text(f"Waiting {delay} minutes before next email...")
             time.sleep(delay * 60)
 
-        send_cold_email(lead, next_step)
+        sent = send_cold_email(lead, next_step)
+        if sent and not is_dry_run():
+            increment_daily_count("emails")
 
     if not quiet:
-        logger.print_text(f"\n=== Email Sequence Step Complete ===")
+        logger.print_text("\n=== Email Sequence Step Complete ===")

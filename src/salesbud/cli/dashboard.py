@@ -3,14 +3,15 @@ Minimalist CLI Dashboard for SalesBud
 Clean, simple, and readable TUI using Rich.
 """
 
-import salesbud.utils.logger as logger
 from typing import Optional
-from rich.table import Table
-from rich.console import Console
-from rich import box
 
-from salesbud.models.lead import get_all_leads, get_leads_by_status, get_lead_stats
-from salesbud.database import get_config, is_dry_run
+from rich import box
+from rich.console import Console
+from rich.table import Table
+
+import salesbud.utils.logger as logger
+from salesbud.database import is_dry_run
+from salesbud.models.lead import get_all_leads, get_lead_stats, get_leads_by_status
 
 # Simple color scheme
 STATUS_COLORS = {
@@ -41,9 +42,8 @@ def show_dashboard(filter_status: Optional[str] = None):
     leads = get_all_leads()
 
     # Count statuses
-    connection_requested = sum(1 for l in leads if l["status"] == "connection_requested")
-    connected = sum(1 for l in leads if l["status"] == "connected")
-    declined = sum(1 for l in leads if l["status"] == "connection_declined")
+    connection_requested = sum(1 for lead in leads if lead["status"] == "connection_requested")
+    connected = sum(1 for lead in leads if lead["status"] == "connected")
 
     # Simple stats line
     console.print(
@@ -100,8 +100,8 @@ def show_dashboard(filter_status: Optional[str] = None):
 
 def show_lead_detail(lead_id: int):
     """Show clean, minimal lead details."""
-    from salesbud.models.lead import get_lead_by_id
     from salesbud.database import get_db
+    from salesbud.models.lead import get_lead_by_id
 
     lead = get_lead_by_id(lead_id)
     if not lead:
