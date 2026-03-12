@@ -39,7 +39,7 @@ async def enrich_company(company_url: str) -> Dict[str, Any]:
     except ImportError:
         logger.print_text("[Enrich] Crawl4AI not installed. Run: pip install crawl4ai")
         return {}
-    except Exception as e:
+    except (RuntimeError, ConnectionError) as e:
         logger.print_text(f"[Enrich] Error enriching {company_url}: {e}")
         return {}
 

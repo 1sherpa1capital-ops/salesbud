@@ -3,20 +3,80 @@ Database configuration and connection utilities
 """
 
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Generator, Optional
 
 from salesbud.utils import logger
+from salesbud.utils.paths import get_db_path
 
-DB_PATH = Path(__file__).parent.parent.parent.parent / "data" / "salesbud.db"
+DB_PATH = get_db_path()
 DB_PATH.parent.mkdir(exist_ok=True)
+
+# Connection singleton for better performance and thread safety
+_db_connection = None
+
+
+@contextmanager
+def get_db_cursor() -> Generator:
+    """Context manager for database operations with automatic commit/rollback.
+
+    Usage:
+        with get_db_cursor() as cursor:
+            cursor.execute("SELECT * FROM leads")
+            results = cursor.fetchall()
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        yield cursor
+        conn.commit()
+    except sqlite3.Error:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+
+
+@contextmanager
+def db_transaction():
+    """Context manager for database transactions with automatic commit/rollback.
+
+    Usage:
+        with db_transaction() as cursor:
+            cursor.execute("INSERT INTO leads ...")
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        yield cursor
+        conn.commit()
+    except sqlite3.Error:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
 
 
 def get_db():
-    """Get database connection with row factory."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Get database connection with row factory.
+
+    Uses singleton pattern with WAL mode for better concurrency.
+    """
+    global _db_connection
+    if _db_connection is None:
+        _db_connection = sqlite3.connect(DB_PATH, check_same_thread=False)
+        _db_connection.row_factory = sqlite3.Row
+        # Enable WAL mode for better concurrency
+        _db_connection.execute("PRAGMA journal_mode=WAL")
+        _db_connection.execute("PRAGMA synchronous=NORMAL")
+    return _db_connection
 
 
 def is_quiet_mode() -> bool:
@@ -108,6 +168,20 @@ def init_db():
     cursor.execute("INSERT OR IGNORE INTO config (key, value) VALUES ('emails_per_day', '50')")
     cursor.execute("INSERT OR IGNORE INTO config (key, value) VALUES ('email_delay_minutes', '2')")
 
+    # Create indexes for performance
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at DESC)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email) WHERE email IS NOT NULL"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_leads_sequence ON leads(status, sequence_step, last_dm_sent_at)"
+    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_activities_lead_id ON activities(lead_id)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_activities_created_at ON activities(created_at DESC)"
+    )
+
     conn.commit()
     conn.close()
     if not is_quiet_mode():
@@ -177,8 +251,38 @@ def get_daily_count(action: str) -> int:
 
 
 def increment_daily_count(action: str) -> int:
-    """Increment today's count for an action and return the new value."""
-    current = get_daily_count(action)
-    new_val = current + 1
-    set_config(f"{action}_sent_today", str(new_val))
-    return new_val
+    """Increment today's count for an action and return the new value.
+
+    Uses atomic UPSERT to prevent race conditions.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    count_key = f"{action}_sent_today"
+
+    # Atomic increment with UPSERT (SQLite 3.24.0+)
+    cursor.execute(
+        """
+        INSERT INTO config (key, value) 
+        VALUES (?, '1')
+        ON CONFLICT(key) DO UPDATE 
+        SET value = CAST(value AS INTEGER) + 1
+        RETURNING value
+    """,
+        (count_key,),
+    )
+
+    result = cursor.fetchone()
+    conn.commit()
+    return int(result[0]) if result else 0
+
+
+def cleanup_old_activities(days: int = 90):
+    """Remove activities older than specified days to manage database size."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM activities WHERE created_at < datetime('now', '-{} days')".format(days)
+    )
+    deleted = cursor.rowcount
+    conn.commit()
+    return deleted

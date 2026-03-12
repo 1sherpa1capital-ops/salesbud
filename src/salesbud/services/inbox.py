@@ -34,15 +34,15 @@ def check_linkedin_inbox() -> List[Dict[str, Any]]:
         logger.print_text("[Inbox] No active leads to check replies for.")
         return []
 
-    from pathlib import Path
-    state_dir = str(Path(__file__).parent.parent.parent.parent / "data" / "browser_state")
+    from salesbud.utils.paths import get_browser_state_dir
+
+    state_dir = str(get_browser_state_dir())
 
     try:
         from salesbud.utils.browser import get_persistent_context
+
         playwright = sync_playwright().start()
-        context, page = get_persistent_context(
-            playwright, state_dir=state_dir, headless=False
-        )
+        context, page = get_persistent_context(playwright, state_dir=state_dir, headless=False)
 
         logger.print_text("[Inbox] Navigating to LinkedIn messaging...")
         page.goto("https://www.linkedin.com/messaging/", timeout=60000)
@@ -135,18 +135,24 @@ def check_linkedin_inbox() -> List[Dict[str, Any]]:
                     }
                 )
 
-            except Exception:
+            except (AttributeError, KeyError, ValueError):
                 # Don't let one thread error kill the whole scan
+                continue
+            except Exception as e:
+                # Log unexpected errors but continue scanning
+                logger.print_text(f"[Inbox] Unexpected error processing thread: {type(e).__name__}")
                 continue
 
         context.close()
         playwright.stop()
 
+    except (ConnectionError, TimeoutError) as e:
+        logger.print_text(f"[Inbox] Network error checking LinkedIn inbox: {e}")
     except Exception as e:
-        logger.print_text(f"[Inbox] Error checking LinkedIn inbox: {e}")
-        import traceback
+        logger.print_text(f"[Inbox] Unexpected error checking LinkedIn inbox: {type(e).__name__}")
+        import logging
 
-        traceback.print_exc()
+        logging.error(f"Inbox error: {e}", exc_info=True)
 
     if replies_found:
         logger.print_text(

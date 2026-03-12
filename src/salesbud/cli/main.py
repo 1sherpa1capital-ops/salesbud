@@ -62,7 +62,7 @@ def _to_compact_toon(obj) -> str:
         return str(obj)
     elif isinstance(obj, str):
         # Use minimal escaping - only escape quotes and backslashes
-        escaped = obj.replace("\\", "\\").replace('"', '\\"').replace("\n", "\\n")
+        escaped = obj.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
         return f'"{escaped}"'
     elif isinstance(obj, list):
         if not obj:
@@ -306,13 +306,16 @@ def main():
     try:
         _run_command(args, use_toon)
     except Exception as e:
-        import traceback
+        import logging
 
+        # Log full error securely
+        logging.error(f"Command failed: {e}", exc_info=True)
+
+        # Show sanitized message to user
         if use_toon:
-            print_toon(False, 0, [], [f"Unexpected error: {e}"])
+            print_toon(False, 0, [], ["An internal error occurred"])
         else:
-            logger.print_text(f"\n✗ Unexpected error: {e}")
-            traceback.print_exc()
+            logger.print_text("An internal error occurred. Check logs.")
         sys.exit(EXIT_CODE_ERROR)
 
 
@@ -324,26 +327,26 @@ def _run_command(args: argparse.Namespace, use_toon: bool) -> None:
         show_help()
         return
 
+    from salesbud.utils.paths import get_db_path
+
     # Commands
     if args.command == "init":
         init_db()
         if use_toon:
-            from pathlib import Path
-
-            db_path = str(Path(__file__).parent.parent.parent.parent / "data" / "salesbud.db")
+            db_path = str(get_db_path())
             print_toon(True, 1, [{"db_path": db_path, "initialized": True}])
         else:
             logger.print_text("Database initialized!")
 
     elif args.command == "login":
         import os
-        from pathlib import Path
 
         from playwright.sync_api import sync_playwright
 
         from salesbud.utils.browser import get_persistent_context
+        from salesbud.utils.paths import get_browser_state_dir
 
-        state_dir = str(Path(__file__).parent.parent.parent.parent / "data" / "browser_state")
+        state_dir = str(get_browser_state_dir())
         os.makedirs(state_dir, exist_ok=True)
 
         if not use_toon:
@@ -375,45 +378,16 @@ def _run_command(args: argparse.Namespace, use_toon: bool) -> None:
 
     elif args.command == "scrape":
         # Check for icp.toon/icp.json fallback if defaults are used
-        import os
-
         query = args.query
         location = args.location
 
         if query == "CEO" and location == "Austin, TX":
-            icp_toon_path = os.path.join(os.getcwd(), "icp.toon")
-            icp_json_path = os.path.join(os.getcwd(), "icp.json")
-            icp_data = None
+            from salesbud.utils.icp_loader import load_icp_config
 
-            # Try icp.toon first (TOON format not yet fully implemented in library, fall back to treating as JSON)
-            if os.path.exists(icp_toon_path):
-                try:
-                    with open(icp_toon_path, "r") as f:
-                        content = f.read()
-                        # TOON library decoder not yet implemented, try parsing as JSON for now
-                        try:
-                            icp_data = decode(content)
-                        except NotImplementedError:
-                            icp_data = json.loads(content)
-                        query = icp_data.get("query", query)
-                        location = icp_data.get("location", location)
-                except Exception as e:
-                    if not use_toon:
-                        from salesbud.utils import logger
-
-                        logger.print_text(f"[Warning] Failed to parse icp.toon: {e}")
-            # Fall back to icp.json
-            elif os.path.exists(icp_json_path):
-                try:
-                    with open(icp_json_path, "r") as f:
-                        icp_data = json.load(f)
-                        query = icp_data.get("query", query)
-                        location = icp_data.get("location", location)
-                except Exception as e:
-                    if not use_toon:
-                        from salesbud.utils import logger
-
-                        logger.print_text(f"[Warning] Failed to parse icp.json: {e}")
+            icp_data = load_icp_config()
+            if icp_data:
+                query = icp_data.get("query", query)
+                location = icp_data.get("location", location)
 
         # Validate inputs
         try:
@@ -523,7 +497,10 @@ def _run_command(args: argparse.Namespace, use_toon: bool) -> None:
         except ValidationError as e:
             return validation_error_toon(use_toon, e)
 
-        html = f"<div style='font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6;'>{validated.body.replace(chr(10), '<br>')}</div>"
+        import html as html_module
+
+        safe_body = html_module.escape(validated.body).replace("\n", "<br>")
+        html = f"<div style='font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6;'>{safe_body}</div>"
         success = send_email(validated.to, validated.subject, html, validated.body)
 
         if use_toon:
@@ -647,45 +624,16 @@ def _run_command(args: argparse.Namespace, use_toon: bool) -> None:
 
     elif args.command == "workflow":
         # Check for icp.toon/icp.json fallback if defaults are used
-        import os
-
         query = args.query
         location = args.location
 
         if query == "CEO" and location == "Austin, TX":
-            icp_toon_path = os.path.join(os.getcwd(), "icp.toon")
-            icp_json_path = os.path.join(os.getcwd(), "icp.json")
-            icp_data = None
+            from salesbud.utils.icp_loader import load_icp_config
 
-            # Try icp.toon first (TOON format not yet fully implemented in library, fall back to treating as JSON)
-            if os.path.exists(icp_toon_path):
-                try:
-                    with open(icp_toon_path, "r") as f:
-                        content = f.read()
-                        # TOON library decoder not yet implemented, try parsing as JSON for now
-                        try:
-                            icp_data = decode(content)
-                        except NotImplementedError:
-                            icp_data = json.loads(content)
-                        query = icp_data.get("query", query)
-                        location = icp_data.get("location", location)
-                except Exception as e:
-                    if not use_toon:
-                        from salesbud.utils import logger
-
-                        logger.print_text(f"[Warning] Failed to parse icp.toon: {e}")
-            # Fall back to icp.json
-            elif os.path.exists(icp_json_path):
-                try:
-                    with open(icp_json_path, "r") as f:
-                        icp_data = json.load(f)
-                        query = icp_data.get("query", query)
-                        location = icp_data.get("location", location)
-                except Exception as e:
-                    if not use_toon:
-                        from salesbud.utils import logger
-
-                        logger.print_text(f"[Warning] Failed to parse icp.json: {e}")
+            icp_data = load_icp_config()
+            if icp_data:
+                query = icp_data.get("query", query)
+                location = icp_data.get("location", location)
 
         logger.print_text("=== SalesBud Full Workflow ===\n")
 
@@ -938,9 +886,7 @@ def _run_command(args: argparse.Namespace, use_toon: bool) -> None:
         config_data = {k: get_config(k) for k in config_keys}
 
         if use_toon:
-            from pathlib import Path
-
-            db_path = str(Path(__file__).parent.parent.parent.parent / "data" / "salesbud.db")
+            db_path = str(get_db_path())
             data = {
                 "dry_run": is_dry_run(),
                 "db_ok": True,
@@ -956,9 +902,7 @@ def _run_command(args: argparse.Namespace, use_toon: bool) -> None:
         else:
             logger.print_text("SalesBud Status")
             logger.print_text(f"  Mode: {'DRY RUN' if is_dry_run() else 'PRODUCTION'}")
-            from pathlib import Path
-
-            db_path = str(Path(__file__).parent.parent.parent.parent / "data" / "salesbud.db")
+            db_path = str(get_db_path())
             logger.print_text(f"  DB: {db_path} (OK)")
             logger.print_text(f"  Leads: {stats.get('total', 0)} total")
             logger.print_text(f"  DM queue: {dm_queue} due for next step")

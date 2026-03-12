@@ -9,6 +9,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Stability Fixes (2026-03-12)
+Production-ready stability improvements for critical error handling:
+
+**Task 1: Subprocess Timeouts (CRITICAL)**
+- Added `timeout=60` to all `subprocess.run()` calls in `services/researcher.py`
+- Lines 35, 42, 51: agent-browser commands with 60s timeout
+- Line 69: agent-browser close command with 30s timeout
+- Prevents indefinite hangs during company research operations
+
+**Task 2: Specific Exception Handling**
+Replaced bare `except Exception` clauses with specific exception types:
+- `services/scraper.py` (lines 149, 156): Changed to `(ValueError, AttributeError, TypeError)` and `(RuntimeError, ConnectionError, TimeoutError)`
+- `services/connector.py` (lines 70, 146-147, 171-172, 216-217, 231): Changed to `(ConnectionError, TimeoutError)`, `(AttributeError, TypeError, RuntimeError)`
+- `services/sequence.py` (lines 88, 97, 101): Changed to `(RuntimeError, OSError, ConnectionError)`
+- `services/emailer.py` (line 171): Changed to `(RuntimeError, ConnectionError, TimeoutError)`
+- `services/email_finder.py` (lines 92, 94, 97, 98, 126, 145, 194, 195, 259, 260): Changed to specific `(socket.error, OSError)`, `(dns.resolver.*)`, `(ValueError)`, `(RuntimeError)`
+- `services/enricher.py` (line 42): Changed to `(RuntimeError, ConnectionError)`
+
+**Task 3: Database Transaction Context Manager**
+- Added `db_transaction()` context manager to `database/connection.py` (lines 44-62)
+- Provides automatic commit/rollback with proper resource cleanup
+- Alias alongside existing `get_db_cursor()` for API consistency
+
+**Task 4: Error Message Sanitization**
+- Modified `cli/main.py` exception handler (lines 306-317)
+- Full error details now logged securely via `logging.error()` with `exc_info=True`
+- User-facing messages sanitized to generic "An internal error occurred"
+- Prevents sensitive information leakage in production
+
+**Task 5: Resource Cleanup in Sequence Service**
+- Enhanced `DMSequenceRunner.stop()` method in `services/sequence.py` (lines 92-104)
+- Changed bare `except Exception` to specific `(RuntimeError, OSError)`
+- Ensures browser context and playwright instances are reliably closed
+- Prevents memory leaks and zombie browser processes
+
+**Benefits:**
+- Eliminates indefinite subprocess hangs
+- More predictable error handling with specific exception types
+- Secure error logging prevents information disclosure
+- Reliable resource cleanup prevents memory leaks
+- Production-ready stability for critical operations
+
+---
+
+### Architecture Improvements (2026-03-12)
+Refactored codebase for better maintainability and code quality:
+
+**New Utility Modules:**
+- Created `salesbud/utils/icp_loader.py` - Centralized ICP config loading from `icp.toon` or `icp.json` files
+- Created `salesbud/utils/paths.py` - Centralized path management for data directories and database
+- Created `salesbud/exceptions.py` - Custom exception hierarchy (SalesBudError, ValidationError, DatabaseError, LinkedInError, EmailError, RateLimitError)
+
+**Path Centralization:**
+- Eliminated 10+ hardcoded `Path(__file__).parent.parent.parent.parent / "data"` patterns across codebase
+- All services now import from `salesbud.utils.paths` for consistent path resolution
+- Updated files: `connector.py`, `sequence.py`, `scraper.py`, `inbox.py`, `main.py`, `connection.py`
+
+**Code Quality:**
+- Added comprehensive docstrings to all public functions in:
+  - `models/lead.py`: get_all_leads, get_lead_by_id, add_lead with proper Args/Returns docs
+  - `services/connector.py`: LinkedInConnector class, send_connection, run_connection_campaign, check_pending_connections
+  - `services/sequence.py`: DMSequenceRunner class, personalize_dm, send_dm_to_lead, get_leads_due_for_step, run_sequence_step
+
+**Refactoring:**
+- Extracted duplicate ICP loading logic from `main.py` (scrape and workflow commands) into `load_icp_config()` utility
+- Reduced code duplication in CLI commands
+- Standardized error handling patterns across services
+
+**Benefits:**
+- Single source of truth for file paths
+- Easier testing and mocking
+- Better IDE support with proper type hints
+- Reduced maintenance burden when directory structure changes
+- Clearer API documentation via docstrings
+
+---
+
 ### Test Results - Phase 2: Email Discovery & Company Enrichment (2026-03-12)
 All Phase 2 production tests completed successfully on Lead ID 22 (Herb Dyer):
 

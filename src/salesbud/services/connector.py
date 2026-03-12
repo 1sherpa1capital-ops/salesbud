@@ -24,7 +24,7 @@ from salesbud.utils.browser import (
     random_delay,
     safe_goto,
 )
-from pathlib import Path
+from salesbud.utils.paths import get_browser_state_dir
 
 LINKEDIN_EMAIL = os.getenv("LINKEDIN_EMAIL")
 LINKEDIN_PASSWORD = os.getenv("LINKEDIN_PASSWORD")
@@ -34,7 +34,19 @@ CONNECTION_NOTE_TEMPLATE = """Hi {name}, came across your profile and loved what
 
 
 class LinkedInConnector:
-    """Manages LinkedIn connections with persistent browser session."""
+    """
+    Manages LinkedIn connections with persistent browser session.
+
+    This class handles the browser lifecycle and provides methods for
+    sending connection requests to LinkedIn profiles.
+
+    Attributes:
+        state_dir: Directory for browser state persistence
+        headless: Whether to run browser in headless mode
+        playwright: Playwright instance
+        context: Browser context
+        page: Active page instance
+    """
 
     def __init__(self, state_dir: str, headless: bool = False):
         self.state_dir = state_dir
@@ -52,8 +64,14 @@ class LinkedInConnector:
             )
             logger.print_text("[Connector] Browser session started")
             return True
-        except Exception as e:
-            logger.print_text(f"[Connector] Failed to start browser: {e}")
+        except (ConnectionError, TimeoutError) as e:
+            logger.print_text(f"[Connector] Network error starting browser: {e}")
+            return False
+        except (RuntimeError, OSError) as e:
+            logger.print_text(f"[Connector] Unexpected error starting browser: {type(e).__name__}")
+            import logging
+
+            logging.error(f"Browser start error: {e}", exc_info=True)
             return False
 
     def stop(self):
@@ -73,7 +91,21 @@ class LinkedInConnector:
     def send_connection(
         self, linkedin_url: str, name: str, company: str = "", personalization_angle: str = ""
     ) -> bool:
-        """Send a single connection request using existing session."""
+        """
+        Send a single connection request to a LinkedIn profile.
+
+        Args:
+            linkedin_url: Full LinkedIn profile URL
+            name: Person's name for personalization
+            company: Company name for connection note
+            personalization_angle: Custom message to use instead of template
+
+        Returns:
+            bool: True if request sent successfully, False otherwise
+
+        Raises:
+            ValueError: If linkedin_url is invalid
+        """
         if not self.page:
             logger.print_text("[Connector] No active browser session")
             return False
@@ -109,7 +141,9 @@ class LinkedInConnector:
                                 break
                         if connect_btn:
                             break
-                    except Exception:
+                    except (AttributeError, TypeError):
+                        continue
+                    except RuntimeError:
                         continue
 
                 if not connect_btn:
@@ -133,7 +167,9 @@ class LinkedInConnector:
                                         break
                             if connect_btn:
                                 break
-                    except Exception:
+                    except (AttributeError, TypeError):
+                        pass
+                    except RuntimeError:
                         pass
 
             if not connect_btn:
@@ -175,7 +211,9 @@ class LinkedInConnector:
                     send_btn = self.page.query_selector(selector)
                     if send_btn and send_btn.is_visible():
                         break
-                except Exception:
+                except (AttributeError, TypeError):
+                    continue
+                except RuntimeError:
                     continue
 
             if send_btn:
@@ -187,16 +225,33 @@ class LinkedInConnector:
                 logger.print_text("[LinkedIn] Could not find Send button")
                 return False
 
+        except (TimeoutError, ConnectionError) as e:
+            logger.print_text(f"[LinkedIn] Network error sending connection request: {e}")
+            return False
         except Exception as e:
-            logger.print_text(f"[LinkedIn] Error sending connection request: {e}")
-            import traceback
+            logger.print_text(
+                f"[LinkedIn] Unexpected error sending connection request: {type(e).__name__}"
+            )
+            import logging
 
-            traceback.print_exc()
+            logging.error(f"Connection error: {e}", exc_info=True)
             return False
 
 
 def run_connection_campaign(max_requests: int = 10, delay_seconds: int = 60):
-    """Run a connection request campaign with single browser session."""
+    """
+    Run a connection request campaign with single browser session.
+
+    Args:
+        max_requests: Maximum number of connection requests to send
+        delay_seconds: Delay between requests in seconds
+
+    Returns:
+        None
+
+    Raises:
+        ValueError: If max_requests is invalid
+    """
 
     dry_run = is_dry_run()
     dms_per_day = int(get_config("dms_per_day") or 50)
@@ -228,7 +283,7 @@ def run_connection_campaign(max_requests: int = 10, delay_seconds: int = 60):
     logger.print_text("-" * 60)
 
     # Start single browser session for all connections
-    state_dir = str(Path(__file__).parent.parent.parent.parent / "data" / "browser_state")
+    state_dir = str(get_browser_state_dir())
     connector = LinkedInConnector(state_dir=state_dir, headless=False)
 
     if not connector.start():
@@ -287,7 +342,18 @@ def get_leads_to_connect() -> List[Dict[str, Any]]:
 
 
 def check_pending_connections():
-    """Check status of pending connection requests."""
+    """
+    Check status of pending connection requests.
+
+    Iterates through all leads with 'connection_requested' status
+    and checks if they have been accepted, declined, or are still pending.
+
+    Returns:
+        None
+
+    Raises:
+        ValueError: If linkedin_url is invalid
+    """
     leads = get_all_leads()
     pending = [lead for lead in leads if lead["status"] == "connection_requested"]
 
@@ -298,7 +364,7 @@ def check_pending_connections():
     logger.print_text(f"\nChecking {len(pending)} pending connections...")
 
     # Use single browser session for checking
-    state_dir = str(Path(__file__).parent.parent.parent.parent / "data" / "browser_state")
+    state_dir = str(get_browser_state_dir())
     connector = LinkedInConnector(state_dir=state_dir, headless=False)
 
     if not connector.start():

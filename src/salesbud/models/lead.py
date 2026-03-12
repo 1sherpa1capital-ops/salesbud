@@ -9,7 +9,12 @@ from salesbud.database import get_db
 
 
 def get_all_leads() -> List[Dict[str, Any]]:
-    """Get all leads ordered by creation date."""
+    """
+    Get all leads ordered by creation date.
+
+    Returns:
+        List[Dict[str, Any]]: List of lead dictionaries, most recent first
+    """
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM leads ORDER BY created_at DESC")
@@ -19,7 +24,15 @@ def get_all_leads() -> List[Dict[str, Any]]:
 
 
 def get_lead_by_id(lead_id: int) -> Optional[Dict[str, Any]]:
-    """Get a single lead by ID."""
+    """
+    Get a single lead by ID.
+
+    Args:
+        lead_id: The unique identifier of the lead
+
+    Returns:
+        Optional[Dict[str, Any]]: Lead dictionary if found, None otherwise
+    """
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM leads WHERE id = ?", (lead_id,))
@@ -45,7 +58,21 @@ def add_lead(
     company: Optional[str] = None,
     location: Optional[str] = None,
 ) -> int:
-    """Add a new lead. Returns lead ID."""
+    """
+    Add a new lead to the database.
+
+    If a lead with the same LinkedIn URL already exists, returns the existing lead's ID.
+
+    Args:
+        linkedin_url: LinkedIn profile URL (unique identifier)
+        name: Lead's full name
+        headline: LinkedIn headline/job title
+        company: Company name
+        location: Geographic location
+
+    Returns:
+        int: The ID of the created or existing lead
+    """
     conn = get_db()
     cursor = conn.cursor()
     lead_id: int = 0
@@ -205,3 +232,35 @@ def update_lead_personalization(lead_id: int, personalization: str):
     )
     conn.commit()
     conn.close()
+
+
+def get_leads_paginated(
+    page: int = 1, page_size: int = 50, status: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """Get leads with pagination support.
+
+    Args:
+        page: Page number (1-indexed)
+        page_size: Number of leads per page
+        status: Optional status filter
+
+    Returns:
+        List of lead dictionaries
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    offset = (page - 1) * page_size
+
+    if status:
+        cursor.execute(
+            "SELECT * FROM leads WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (status, page_size, offset),
+        )
+    else:
+        cursor.execute(
+            "SELECT * FROM leads ORDER BY created_at DESC LIMIT ? OFFSET ?", (page_size, offset)
+        )
+
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]

@@ -168,7 +168,7 @@ def send_email(to: str, subject: str, html: str, text: str = "") -> bool:
         logger.print_text(f"[Email] ✓ Sent to {to} (ID: {result.get('id', 'unknown')})")
         return True
 
-    except Exception as e:
+    except (RuntimeError, ConnectionError, TimeoutError) as e:
         logger.print_text(f"[Email] Error sending to {to}: {e}")
         import traceback
 
@@ -242,16 +242,19 @@ def get_leads_due_for_email(min_days: int = 3) -> list:
     """Get leads that are due for the next email step."""
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute(f"""
+    cursor.execute(
+        """
         SELECT * FROM leads
         WHERE email IS NOT NULL
         AND email != ''
         AND email_sequence_step > 0
         AND email_sequence_step < 4
         AND last_email_sent_at IS NOT NULL
-        AND datetime(last_email_sent_at) <= datetime('now', '-{min_days} days')
+        AND datetime(last_email_sent_at) <= datetime('now', '-' || ? || ' days')
         AND status NOT IN ('replied', 'booked', 'paused')
-    """)
+    """,
+        (min_days,),
+    )
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]

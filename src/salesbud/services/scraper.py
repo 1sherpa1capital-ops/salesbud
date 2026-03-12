@@ -76,12 +76,11 @@ def scrape_linkedin_search(
 
         playwright = sync_playwright().start()
 
-        from pathlib import Path
-        state_dir = str(Path(__file__).parent.parent.parent.parent / "data" / "browser_state")
+        from salesbud.utils.paths import get_browser_state_dir
 
-        context, page = get_persistent_context(
-            playwright, state_dir=state_dir, headless=False
-        )
+        state_dir = str(get_browser_state_dir())
+
+        context, page = get_persistent_context(playwright, state_dir=state_dir, headless=False)
 
         logger.print_text(f"[LinkedIn] Navigating to: {url}")
 
@@ -107,7 +106,7 @@ def scrape_linkedin_search(
 
         logger.print_text(f"[LinkedIn] Found {len(profile_ids)} unique profiles")
 
-        for profile_id in profile_ids[:max_leads]: # type: ignore
+        for profile_id in profile_ids[:max_leads]:  # type: ignore
             try:
                 profile_url = f"https://www.linkedin.com/in/{profile_id}/"
                 name = "Unknown"
@@ -124,7 +123,7 @@ def scrape_linkedin_search(
                     anchor_content = context_match.group(1)
                     clean_text = re.sub(r"<[^>]+>", "", anchor_content)
                     if isinstance(clean_text, str) and clean_text.strip():
-                        name = clean_text.strip()[:50] # type: ignore
+                        name = clean_text.strip()[:50]  # type: ignore
 
                 # Try to find headline
                 headline_match = re.search(
@@ -147,14 +146,14 @@ def scrape_linkedin_search(
                     leads.append(lead)
                     logger.print_text(f"  - {lead['name']}")
 
-            except Exception as e:
+            except (ValueError, AttributeError, TypeError) as e:
                 logger.print_text(f"  [Error] Failed to extract lead: {e}")
                 continue
 
         context.close()
         playwright.stop()
 
-    except Exception as e:
+    except (RuntimeError, ConnectionError, TimeoutError) as e:
         logger.print_text(f"[LinkedIn] Scraping error: {e}")
         import traceback
 
@@ -177,15 +176,18 @@ def scrape_leads(query: str, location: Optional[str] = None, max_leads: int = 50
         logger.print_text(f"Location: {location or 'Any'}")
         logger.print_text(f"Max leads: {max_leads}")
 
-    from pathlib import Path
-    state_dir = str(Path(__file__).parent.parent.parent.parent / "data" / "browser_state")
+    from salesbud.utils.paths import get_browser_state_dir
+
+    state_dir = str(get_browser_state_dir())
     has_creds = os.path.exists(state_dir)
 
     if is_dry_run() or not has_creds:
         if is_dry_run() and not quiet:
             logger.print_text("Dry run: True")
         if not has_creds and not quiet:
-            logger.print_text("No persistent browser state found - run 'salesbud login' first. Running in demo mode")
+            logger.print_text(
+                "No persistent browser state found - run 'salesbud login' first. Running in demo mode"
+            )
 
         if not quiet:
             logger.print_text("\n[DRY RUN] Example leads (simulated):")
@@ -223,7 +225,7 @@ def scrape_leads(query: str, location: Optional[str] = None, max_leads: int = 50
             },
         ]
 
-        for lead in sample_leads[:max_leads]: # type: ignore
+        for lead in sample_leads[:max_leads]:  # type: ignore
             linkedin_url = f"https://www.linkedin.com/in/{lead['name'].lower().replace(' ', '-')}"
             lead_id = add_lead(
                 linkedin_url=linkedin_url,
@@ -236,7 +238,7 @@ def scrape_leads(query: str, location: Optional[str] = None, max_leads: int = 50
                 logger.print_text(f"  - Added: {lead['name']}")
             log_activity(lead_id, "lead_added", f"Scraped: {lead['name']} at {lead['company']}")
 
-        return len(sample_leads[:max_leads]) # type: ignore
+        return len(sample_leads[:max_leads])  # type: ignore
 
     # Real scraping
     if not quiet:

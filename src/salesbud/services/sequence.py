@@ -7,6 +7,8 @@ import datetime
 import random
 from typing import Any, Dict, List
 
+from playwright.sync_api import Page, Playwright, sync_playwright
+
 import salesbud.utils.logger as logger
 from salesbud.database import (
     get_db,
@@ -53,8 +55,153 @@ DEFAULT_VARS = {
 }
 
 
+class DMSequenceRunner:
+    """
+    Manages DM sequence execution with persistent browser session.
+
+    This class handles the browser lifecycle and provides methods for
+    sending DMs to leads in the sequence.
+
+    Attributes:
+        playwright: Playwright instance
+        context: Browser context
+        page: Active page instance
+    """
+
+    def __init__(self):
+        self.playwright: Playwright = None
+        self.context = None
+        self.page: Page = None
+
+    def start(self) -> bool:
+        """Initialize browser session."""
+        from salesbud.utils.paths import get_browser_state_dir
+
+        state_dir = str(get_browser_state_dir())
+        try:
+            self.playwright = sync_playwright().start()
+            self.context, self.page = get_persistent_context(
+                self.playwright, state_dir=state_dir, headless=False
+            )
+            logger.print_text("[DM Runner] Browser session started")
+            return True
+        except (RuntimeError, OSError, ConnectionError) as e:
+            logger.print_text(f"[DM Runner] Failed to start browser: {e}")
+            return False
+
+    def stop(self):
+        """Clean up browser session."""
+        if self.context:
+            try:
+                self.context.close()
+            except (RuntimeError, OSError):
+                pass
+        if self.playwright:
+            try:
+                self.playwright.stop()
+            except (RuntimeError, OSError):
+                pass
+        logger.print_text("[DM Runner] Browser session closed")
+
+    def send_dm_to_lead(self, lead: Dict[str, Any], step: int) -> bool:
+        """
+        Send a DM to a lead using existing browser session.
+
+        Args:
+            lead: Lead dictionary containing linkedin_url, name, etc.
+            step: Sequence step number (1-5)
+
+        Returns:
+            bool: True if DM was sent successfully, False otherwise
+
+        Raises:
+            ValueError: If step is not between 1 and 5
+        """
+        dm_text = personalize_dm(lead, step)
+        step_info = DM_TEMPLATES[step]
+
+        if is_dry_run():
+            logger.print_text(
+                f"\n[DRY RUN] Would send DM Step {step} ({step_info['name']}) to {lead.get('name', 'Unknown')}"
+            )
+            logger.print_text(f"[DRY RUN] Message: {dm_text[:100]}...")
+            logger.print_text(f"[DRY RUN] LinkedIn URL: {lead.get('linkedin_url', 'N/A')}")
+            log_activity(lead["id"], "dm_sent", f"[DRY RUN] Step {step}: {dm_text[:200]}")
+            update_lead_dm_sent(lead["id"], step)
+            return True
+
+        linkedin_url = lead.get("linkedin_url")
+        if not linkedin_url:
+            logger.print_text(f"[DM] No LinkedIn URL for lead {lead.get('name')} — skipping")
+            return False
+
+        try:
+            if not safe_goto(self.page, linkedin_url, timeout=60000):
+                logger.print_text(f"[DM] Failed to navigate to {linkedin_url}")
+                return False
+
+            self.page.wait_for_timeout(int(jitter_delay(2.5) * 1000))
+
+            challenge = check_for_challenge(self.page)
+            if challenge:
+                logger.print_text(f"[DM] Challenge detected: {challenge}")
+                return False
+
+            # Try multiple selectors for the Message button
+            msg_btn = self.page.query_selector('button[aria-label*="Message"]')
+            if not msg_btn:
+                msg_btn = self.page.query_selector('text="Message"')
+
+            if not msg_btn:
+                logger.print_text(
+                    f"[DM] No Message button for {lead.get('name')} — maybe not connected?"
+                )
+                return False
+
+            # Force click to bypass any premium upsell banners
+            msg_btn.click(force=True)
+            self.page.wait_for_timeout(random.randint(1000, 2000))
+
+            msg_box = self.page.query_selector('div[role="textbox"]')
+            if not msg_box:
+                logger.print_text(f"[DM] Could not find message box for {lead.get('name')}")
+                return False
+
+            msg_box.click()
+            self.page.wait_for_timeout(int(jitter_delay(1) * 1000))
+            self.page.keyboard.type(dm_text, delay=random.randint(30, 80))
+            self.page.wait_for_timeout(random.randint(500, 1000))
+            self.page.keyboard.press("Enter")
+
+            self.page.wait_for_timeout(random.randint(1000, 2000))
+
+            logger.print_text(f"[DM] Sent Step {step} to {lead.get('name')}")
+            log_activity(lead["id"], "dm_sent", f"Step {step}: {dm_text[:200]}")
+            update_lead_dm_sent(lead["id"], step)
+            return True
+
+        except Exception as e:
+            logger.print_text(f"[DM] Error sending to {lead.get('name')}: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return False
+
+
 def personalize_dm(lead: Dict[str, Any], step: int) -> str:
-    """Generate personalized DM for a lead at a given sequence step."""
+    """
+    Generate personalized DM for a lead at a given sequence step.
+
+    Args:
+        lead: Lead dictionary containing name, headline, company, etc.
+        step: Sequence step number (1-5)
+
+    Returns:
+        str: Personalized DM text
+
+    Raises:
+        ValueError: If step is not between 1 and 5
+    """
     if step == 1 and lead.get("personalization_angle"):
         return lead["personalization_angle"]
 
@@ -77,24 +224,43 @@ def personalize_dm(lead: Dict[str, Any], step: int) -> str:
 
 
 def get_leads_due_for_step(min_days: int = 3) -> List[Dict[str, Any]]:
-    """Get leads that are due for the next DM step."""
+    """
+    Get leads that are due for the next DM step.
+
+    Args:
+        min_days: Minimum number of days since last DM
+
+    Returns:
+        List[Dict[str, Any]]: List of lead dictionaries
+
+    Raises:
+        ValueError: If min_days is negative
+    """
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute(f"""
+    cursor.execute(
+        """
         SELECT * FROM leads
         WHERE status = 'active'
         AND sequence_step > 0
         AND sequence_step < 5
         AND last_dm_sent_at IS NOT NULL
-        AND datetime(last_dm_sent_at) <= datetime('now', '-{min_days} days')
-    """)
+        AND datetime(last_dm_sent_at) <= datetime('now', '-' || ? || ' days')
+    """,
+        (min_days,),
+    )
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
 
 def get_newly_connected_leads() -> List[Dict[str, Any]]:
-    """Get leads that are connected but haven't started DM sequence yet."""
+    """
+    Get leads that are connected but haven't started DM sequence yet.
+
+    Returns:
+        List[Dict[str, Any]]: List of lead dictionaries
+    """
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
@@ -108,99 +274,26 @@ def get_newly_connected_leads() -> List[Dict[str, Any]]:
 
 
 def send_dm(lead: Dict[str, Any], step: int) -> bool:
-    """Send a DM to a lead (or log in dry-run mode)."""
-    dm_text = personalize_dm(lead, step)
-    step_info = DM_TEMPLATES[step]
+    """
+    Send a DM to a lead using a fresh browser session (legacy method).
 
-    if is_dry_run():
-        logger.print_text(
-            f"\n[DRY RUN] Would send DM Step {step} ({step_info['name']}) to {lead.get('name', 'Unknown')}"
-        )
-        logger.print_text(f"[DRY RUN] Message: {dm_text[:100]}...")
-        logger.print_text(f"[DRY RUN] LinkedIn URL: {lead.get('linkedin_url', 'N/A')}")
-        log_activity(lead["id"], "dm_sent", f"[DRY RUN] Step {step}: {dm_text[:200]}")
-        update_lead_dm_sent(lead["id"], step)
-        return True
+    Note: Use DMSequenceRunner for batch operations to avoid
+    repeatedly starting/stopping browser sessions.
 
-    linkedin_url = lead.get("linkedin_url")
-    if not linkedin_url:
-        logger.print_text(f"[DM] No LinkedIn URL for lead {lead.get('name')} — skipping")
+    Args:
+        lead: Lead dictionary containing linkedin_url, name, etc.
+        step: Sequence step number (1-5)
+
+    Returns:
+        bool: True if DM was sent successfully, False otherwise
+    """
+    runner = DMSequenceRunner()
+    if not runner.start():
         return False
-
     try:
-        from pathlib import Path
-
-        from playwright.sync_api import sync_playwright
-
-        state_dir = str(Path(__file__).parent.parent.parent.parent / "data" / "browser_state")
-
-        playwright = sync_playwright().start()
-        context, page = get_persistent_context(
-            playwright, state_dir=state_dir, headless=False
-        )
-
-        if not safe_goto(page, linkedin_url, timeout=60000):
-            logger.print_text(f"[DM] Failed to navigate to {linkedin_url}")
-            context.close()
-            playwright.stop()
-            return False
-
-        page.wait_for_timeout(int(jitter_delay(2.5) * 1000))
-
-        challenge = check_for_challenge(page)
-        if challenge:
-            logger.print_text(f"[DM] Challenge detected: {challenge}")
-            context.close()
-            playwright.stop()
-            return False
-
-        # Try multiple selectors for the Message button. LinkedIn UI changes frequently.
-        # First try the standard aria-label button
-        msg_btn = page.query_selector('button[aria-label*="Message"]')
-        if not msg_btn:
-            # Fallback: Look for a button or link containing exactly the text "Message"
-            msg_btn = page.query_selector('text="Message"')
-
-        if not msg_btn:
-            logger.print_text(
-                f"[DM] No Message button for {lead.get('name')} — maybe not connected?"
-            )
-            context.close()
-            playwright.stop()
-            return False
-
-        # Force click to bypass any premium upsell banners covering the button
-        msg_btn.click(force=True)
-        page.wait_for_timeout(random.randint(1000, 2000))
-
-        msg_box = page.query_selector('div[role="textbox"]')
-        if not msg_box:
-            logger.print_text(f"[DM] Could not find message box for {lead.get('name')}")
-            context.close()
-            playwright.stop()
-            return False
-
-        msg_box.click()
-        page.wait_for_timeout(int(jitter_delay(1) * 1000))
-        page.keyboard.type(dm_text, delay=random.randint(30, 80))
-        page.wait_for_timeout(random.randint(500, 1000))
-        page.keyboard.press("Enter")
-
-        page.wait_for_timeout(random.randint(1000, 2000))
-        context.close()
-        playwright.stop()
-
-        logger.print_text(f"[DM] Sent Step {step} to {lead.get('name')}")
-        log_activity(lead["id"], "dm_sent", f"Step {step}: {dm_text[:200]}")
-        update_lead_dm_sent(lead["id"], step)
-        return True
-
-    except Exception as e:
-        logger.print_text(f"[DM] Error sending to {lead.get('name')}: {e}")
-        import traceback
-
-        traceback.print_exc()
-        return False
+        return runner.send_dm_to_lead(lead, step)
+    finally:
+        runner.stop()
 
 
 def is_quiet_mode() -> bool:
@@ -209,7 +302,20 @@ def is_quiet_mode() -> bool:
 
 
 def run_sequence_step():
-    """Run one step of the sequence for all active leads."""
+    """
+    Run one step of the DM sequence for all active leads.
+
+    This function:
+    1. Checks for newly connected leads and starts their sequences
+    2. Processes leads already in the sequence
+    3. Respects rate limits and idempotency guards
+
+    Returns:
+        None
+
+    Raises:
+        ValueError: If rate limit configuration is invalid
+    """
     from salesbud.database import get_config
 
     quiet = is_quiet_mode()

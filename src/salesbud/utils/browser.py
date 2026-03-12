@@ -10,6 +10,8 @@ from typing import Optional, Tuple, cast
 
 from playwright.sync_api import Browser, BrowserContext, Page, Playwright, ViewportSize
 
+import salesbud.utils.logger as logger
+
 STEALTH_SCRIPT = """
 Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
 Object.defineProperty(navigator, 'plugins', {
@@ -72,6 +74,8 @@ def get_stealth_context(
         try:
             cookies = json.loads(session_cookie)
             context.add_cookies(cookies)
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.print_text(f"[Browser] Failed to parse session cookie: {e}")
         except Exception:
             pass
 
@@ -116,8 +120,13 @@ def safe_goto(page: Page, url: str, timeout: int = 60000, retries: int = 2) -> b
             page.goto(url, timeout=timeout, wait_until="domcontentloaded")
             page.wait_for_timeout(random_delay(1000, 2000))
             return True
+        except (TimeoutError, ConnectionError) as e:
+            logger.print_text(f"[Stealth Browser] safe_goto network error: {e}")
+            if attempt < retries - 1:
+                continue
+            return False
         except Exception as e:
-            print(f"[Stealth Browser] safe_goto exception: {e}")
+            logger.print_text(f"[Stealth Browser] safe_goto unexpected error: {type(e).__name__}")
             if "ERR_TOO_MANY_REDIRECTS" in str(e) and attempt < retries - 1:
                 page.wait_for_timeout(random_delay(3000, 5000))
                 continue
@@ -131,6 +140,8 @@ def check_for_challenge(page: Page, wait_for_user: bool = True) -> Optional[str]
     url = page.url.lower()
     try:
         content = page.content().lower()
+    except (ConnectionError, TimeoutError):
+        content = ""
     except Exception:
         content = ""
 
@@ -146,6 +157,7 @@ def check_for_challenge(page: Page, wait_for_user: bool = True) -> Optional[str]
         print("Please solve it manually in the browser window within 60 seconds.")
 
         import time
+
         max_wait = 60
         start_time = time.time()
         while time.time() - start_time < max_wait:
@@ -153,6 +165,8 @@ def check_for_challenge(page: Page, wait_for_user: bool = True) -> Optional[str]
             try:
                 c = page.content().lower()
                 u = page.url.lower()
+            except (ConnectionError, TimeoutError):
+                continue
             except Exception:
                 continue
             still_there = False

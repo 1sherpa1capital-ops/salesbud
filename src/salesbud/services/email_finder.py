@@ -86,10 +86,15 @@ def verify_smtp(email: str, timeout: int = 10) -> bool:
             sock.close()
 
             return "250" in response or "OK" in response
-        except Exception:
+        except (socket.error, OSError):
             sock.close()
             return False
-    except Exception:
+        except RuntimeError:
+            sock.close()
+            return False
+    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.resolver.NoNameservers):
+        return False
+    except (dns.resolver.NoResolver, socket.error):
         return False
 
 
@@ -115,7 +120,9 @@ def search_duckduckgo(
                     return email
             if emails:
                 return emails[0]
-    except Exception:
+    except (requests.RequestException, TimeoutError):
+        pass
+    except ValueError:
         pass
 
     return None
@@ -133,7 +140,9 @@ def scrape_company_pages(domain: str) -> list:
             if response.status_code == 200:
                 page_emails = find_emails_on_page(response.text)
                 emails.extend(page_emails)
-        except Exception:
+        except (requests.RequestException, TimeoutError):
+            continue
+        except ValueError:
             continue
 
     return list(set(emails))
@@ -180,7 +189,9 @@ def find_email_for_lead(lead: dict, quick_mode: bool = False) -> Optional[str]:
             search_result = search_duckduckgo(first_name, last_name, company, timeout=5)
             if search_result:
                 return search_result
-        except Exception:
+        except (requests.RequestException, TimeoutError):
+            pass
+        except ValueError:
             pass
 
         patterns = guess_email_patterns(first_name, last_name, domain)
@@ -243,7 +254,9 @@ def batch_find_emails(max_leads: int = 10, quick_mode: bool = False) -> list:
                         results.append(
                             {"lead_id": lead["id"], "email": email, "verified": verified}
                         )
-                except Exception:
+                except (TimeoutError, ValueError):
+                    continue
+                except RuntimeError:
                     continue
     else:
         for lead in leads:
