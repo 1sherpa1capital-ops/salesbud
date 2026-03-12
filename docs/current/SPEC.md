@@ -1,6 +1,6 @@
 # SalesBud — Specification
 
-**Version:** 1.3.0 | **Date:** March 11, 2026 | **Status:** Live — Production Ready
+**Version:** 1.4.0 | **Date:** March 12, 2026 | **Status:** Live — Agent-Browser Integration Ready
 
 ---
 
@@ -56,6 +56,7 @@ SalesBud is a **Python CLI** that automates two-channel outbound sales developme
 | Database | SQLite | Built-in |
 | Environment | python-dotenv | ≥1.0.0 |
 | Build system | Hatchling | Latest |
+| TOON Format | toon-format | ≥0.1.0 |
 
 ---
 
@@ -64,20 +65,52 @@ SalesBud is a **Python CLI** that automates two-channel outbound sales developme
 ```
 salesbud/
 ├── src/salesbud/
-│   ├── main.py                  # CLI entry point (argparse)
-│   ├── database.py              # SQLite connection, config, activity logging
+│   ├── __init__.py
+│   ├── __main__.py              # Entry point
+│   │
+│   ├── cli/
+│   │   ├── __init__.py
+│   │   ├── main.py              # CLI commands (TOON format)
+│   │   └── dashboard.py         # Dashboard display
+│   │
+│   ├── config/
+│   │   ├── __init__.py
+│   │   └── env.py               # Environment configuration
+│   │
+│   ├── database/
+│   │   ├── __init__.py
+│   │   └── connection.py        # SQLite connection & schema
+│   │
 │   ├── models/
-│   │   └── lead.py              # Lead CRUD + email ops
+│   │   ├── __init__.py
+│   │   ├── lead.py              # Lead CRUD operations
+│   │   └── validation.py        # Pydantic input validation
+│   │
 │   ├── services/
-│   │   ├── scraper.py           # LinkedIn scraping (Playwright)
-│   │   ├── connector.py         # Connection requests + acceptance checks
-│   │   ├── sequence.py          # 5-step NEPQ DM engine
-│   │   └── emailer.py           # 4-step cold email engine (Resend)
-│   └── cli/
-│       └── dashboard.py         # Unified terminal dashboard
-├── data/salesbud.db             # SQLite (gitignored)
-├── .env                         # Credentials (gitignored)
-└── .env.example
+│   │   ├── __init__.py
+│   │   ├── scraper.py           # LinkedIn scraping
+│   │   ├── connector.py         # Connection requests
+│   │   ├── sequence.py          # DM sequences
+│   │   ├── emailer.py           # Cold email campaigns
+│   │   ├── email_finder.py      # Email discovery
+│   │   ├── enricher.py          # Company enrichment
+│   │   ├── inbox.py             # LinkedIn inbox checking
+│   │   ├── researcher.py        # Company research (agent-browser)
+│   │   └── personalizer.py      # Icebreaker generation
+│   │
+│   └── utils/
+│       ├── __init__.py
+│       ├── browser.py           # Playwright utilities
+│       └── logger.py            # Centralized logging
+│
+├── scripts/
+│   └── prod_check.py            # Production readiness checker
+│
+├── data/
+│   ├── salesbud.db              # SQLite (gitignored)
+│   └── browser_state/           # Persistent browser sessions
+│
+└── .env                         # Credentials (gitignored)
 ```
 
 ---
@@ -102,7 +135,16 @@ CREATE TABLE leads (
     last_reply_at       TEXT,
     booking_date        TEXT,
     created_at          TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at          TEXT DEFAULT CURRENT_TIMESTAMP
+    updated_at          TEXT DEFAULT CURRENT_TIMESTAMP,
+    company_url         TEXT,                   -- for enrichment/research
+    company_description TEXT,                   -- enriched company data
+    company_size_est    TEXT,                   -- company size estimate
+    buying_signals      TEXT,                   -- JSON list of signals
+    email_source        TEXT,                   -- browser/manual/smtp-guess
+    email_verified      INTEGER DEFAULT 0,      -- SMTP verification status
+    enriched_at         TEXT,                   -- enrichment timestamp
+    company_research    TEXT,                   -- agent-browser snapshot
+    personalization_angle TEXT                  -- generated icebreaker
 );
 
 CREATE TABLE activities (
@@ -152,6 +194,14 @@ CREATE TABLE config (
 | `dashboard` | `--status` | Unified DM + Email dashboard |
 | `lead` | `lead_id` | Full lead detail (DM step, Email step, activity log) |
 | `reply` | `lead_id`, `reply_type` | Simulate reply (dry-run only) |
+| `research` | `lead_id` | Research company via agent-browser |
+| `personalize` | `lead_id` | Generate personalization angle |
+| `set-company-url` | `lead_id`, `url` | Set company URL for enrichment |
+| `find-email` | `lead_id`, `[--quick]` | Find email for lead |
+| `find-emails` | `--max N`, `[--quick]` | Batch email discovery |
+| `enrich` | `lead_id` | Enrich lead with company data |
+| `enrich-all` | `--max N` | Batch enrich leads |
+| `check-replies` | — | Scan LinkedIn inbox for replies |
 | `config` | `key`, `value` | Get / set config values |
 
 ### `database.py` — Database Layer
@@ -180,6 +230,18 @@ CREATE TABLE config (
 | `update_lead_email(id, email)` | Set/update email address |
 | `update_lead_email_sent(id, step)` | Email step + `last_email_sent_at` |
 | `get_lead_stats()` | Aggregate counts by status + email counts |
+
+### `models/validation.py` — Input Validation
+
+**Purpose:** Pydantic models for CLI input validation.
+
+| Model | Validates |
+|-------|-----------|
+| `ScrapeInput` | query, location, max_results |
+| `ConnectInput` | max_requests, delay_seconds |
+| `AddEmailInput` | lead_id, email |
+| `SendEmailInput` | to, subject, body |
+| `SetCompanyUrlInput` | lead_id, company_url |
 
 ### `services/scraper.py` — LinkedIn Scraper
 
@@ -234,6 +296,43 @@ CREATE TABLE config (
 | `get_leads_ready_for_email_start()` | Email set, `email_sequence_step == 0` |
 | `get_leads_due_for_email(min_days)` | Due for next step by elapsed days |
 | `run_email_sequence_step()` | One tick across all eligible leads |
+
+### `services/researcher.py` — Company Research
+
+**Purpose:** Uses agent-browser CLI to research company websites and capture accessibility snapshots.
+
+**Dependencies:** agent-browser (npm install -g @vercel-labs/agent-browser)
+
+| Function | Description |
+|----------|-------------|
+| `perform_company_research(lead_id)` | Opens company_url, takes snapshot, saves to DB |
+
+**Flow:**
+1. Check lead has company_url set
+2. Call `agent-browser open <url>`
+3. Wait for networkidle
+4. Capture snapshot with `agent-browser snapshot -i -C`
+5. Save output to `company_research` column
+6. Close browser session
+
+---
+
+### `services/personalizer.py` — Icebreaker Generation
+
+**Purpose:** Generates personalized connection request notes based on company research.
+
+| Function | Description |
+|----------|-------------|
+| `generate_personalization(lead_id)` | Creates contextual icebreaker from research data |
+
+**Logic:**
+1. Load company_research for lead
+2. Keyword detection (AI, marketing, SaaS, etc.)
+3. Generate contextual hook
+4. Construct icebreaker with name and title
+5. Save to `personalization_angle` column
+
+**Current Implementation:** Template-based with keyword heuristics. Production: Plug in OpenAI/Anthropic/GenKit.
 
 ### `cli/dashboard.py` — Terminal Dashboard
 
@@ -300,7 +399,37 @@ When `dry_run = 1` (default):
 
 ---
 
-## 10. Functional Requirements
+## 10. TOON Output Format
+
+All CLI commands support `--toon` flag for machine-readable output optimized for AI agents.
+
+**Format:** Compact TOON (Token-Oriented Object Notation)
+
+```
+{s:T,c:1,d:[{field1,value1,field2,value2}],e:[]}
+```
+
+**Fields:**
+- `s`: Success (T/F)
+- `c`: Count (integer)
+- `d`: Data array
+- `e`: Errors array
+
+**Example:**
+```bash
+$ python -m salesbud status --toon
+{s:T,c:1,d:[1]dry_run,db_ok,total_leads:{F,T,19},e:[]}
+```
+
+**Exit Codes:**
+- `0`: Success
+- `1`: Error (check `e` field)
+- `2`: Rate-limited
+- `3`: Nothing to process
+
+---
+
+## 11. Functional Requirements
 
 ### Lead Acquisition
 | ID | Requirement | ✓ |
@@ -347,7 +476,7 @@ When `dry_run = 1` (default):
 
 ---
 
-## 11. Success Metrics
+## 12. Success Metrics
 
 | Metric | Target |
 |--------|--------|
@@ -361,7 +490,7 @@ When `dry_run = 1` (default):
 
 ---
 
-## 12. Post-MVP Roadmap
+## 13. Post-MVP Roadmap
 
 | Feature | Priority |
 |---------|----------|

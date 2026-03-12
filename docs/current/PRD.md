@@ -1,8 +1,8 @@
 # SalesBud — Product Requirements Document
 
-**Version:** 2.0 (Rolling out / v1.3.0 Live)
-**Date:** March 11, 2026
-**Status:** Active Development — v1.3.0 base exists (production hardened), v2.0 gaps identified
+**Version:** 1.4.0
+**Date:** March 12, 2026
+**Status:** Production Ready — Agent-Browser Integration Complete
 **Philosophy:** Build a rock-solid CLI. Let AI agents (OpenCode / Claude Code) be the UI.
 
 ---
@@ -73,7 +73,7 @@ config: key, value (with 8 default keys)
 - Email via Resend: fully implemented, dry-run mode works correctly
 - Email sequence (4-step): logic complete, personalization working
 - Dashboard: shows both DM (x/5) and email (x/4) columns — confirmed
-- JSON output: all commands support `--json` flag
+- TOON output: all commands support `--toon` flag
 - Status command: returns system health with DB/path/queue/auth status
 - Email discovery: browser-based discovery + SMTP verification
 - Company enrichment: Crawl4AI-powered scraping
@@ -107,7 +107,7 @@ These require user action to complete:
 
 | Problem | Impact |
 |---------|--------|
-| No `--json` output — AI agents can't parse CLI output | **Blocks Mode B entirely** |
+| No `--toon` output — AI agents can't parse CLI output | **Blocks Mode B entirely** |
 | DM send in production is a stub — no real Playwright DM sending | **Sequences don't actually work live** |
 | No email discovery — manual `add-email` only | Requires manual research per lead |
 | No web enrichment — can't personalize beyond LinkedIn headline | Generic messaging |
@@ -128,7 +128,7 @@ Rhigden runs commands manually each morning. Reviews dashboard. Adds emails.
 OpenCode or Claude Code reads `AGENTS.md`, understands the CLI, and operates SalesBud autonomously. Rhigden says: *"Run the workflow for CFOs in NYC, max 15 leads, get emails, start both sequences."* The agent does the rest.
 
 **For Mode B to work, the CLI needs:**
-- `--json` output flags on every command (machine-readable)
+- `--toon` output flags on every command (machine-readable)
 - Clear exit codes (0 = success, 1 = error, 2 = rate-limited, 3 = nothing to process)
 - Idempotent commands (safe to re-run)
 - A `status` command the AI can poll
@@ -140,8 +140,8 @@ OpenCode or Claude Code reads `AGENTS.md`, understands the CLI, and operates Sal
 # AI agent discovers email using agent-browser:
 agent-browser open https://company.com/team && agent-browser snapshot -i
 # (AI reads snapshot, finds email pattern)
-python -m salesbud add-email 42 found@company.com --json
-python -m salesbud email-sequence --json
+python -m salesbud add-email 42 found@company.com --toon
+python -m salesbud email-sequence --toon
 ```
 
 ---
@@ -251,8 +251,8 @@ def verify_smtp(email: str) -> bool:
 
 | PRD Section | Feature | Status | Notes |
 |-------------|---------|--------|-------|
-| Phase 1 | `--json` flag on all commands | ✅ DONE | Added to all commands |
-| Phase 1 | `status` command | ✅ DONE | Implemented with --json |
+| Phase 1 | `--toon` flag on all commands | ✅ DONE | Added to all commands |
+| Phase 1 | `status` command | ✅ DONE | Implemented with --toon |
 | Phase 1 | Structured exit codes | ✅ DONE | 0/1/2/3 defined in main.py |
 | Phase 1 | `--quiet` flag | ⚪ DEFERRED | Not critical for v2.0 |
 | Phase 2 | `find-email <id>` | ✅ DONE | email_finder.py + CLI |
@@ -286,6 +286,9 @@ def verify_smtp(email: str) -> bool:
 | Code quality | `sqlite3` import at bottom of `lead.py` | ✅ DONE | Moved to top |
 | Code quality | `agent-browser` not installed | ⚪ DEFERRED | User to install |
 | Code quality | `crawl4ai`, `browser-use`, `dnspython` not installed | ⚪ DEFERRED | User to install |
+| Research service | ✅ DONE | researcher.py with agent-browser |
+| Personalization service | ✅ DONE | personalizer.py with keyword heuristics |
+| TOON format migration | ✅ DONE | All --json changed to --toon |
 
 ---
 
@@ -297,7 +300,7 @@ These are low-effort, high-leverage changes. **Mode B is impossible without them
 
 | Feature | Command | Notes |
 |---------|---------|-------|
-| `--json` flag on all commands | All 14 commands | Return `{"success": bool, "count": int, "data": [...]}` |
+| `--toon` flag on all commands | All 14 commands | Return `{"success": bool, "count": int, "data": [...]}` |
 | `status` command | `python -m salesbud status` | DB counts, rate limit state, dry_run, mode |
 | Structured exit codes | All commands | 0=ok, 1=error, 2=rate-limited, 3=nothing to process |
 | `--quiet` flag | All commands | Suppress human-readable output for scripting |
@@ -347,13 +350,15 @@ These are low-effort, high-leverage changes. **Mode B is impossible without them
 ### Current Commands (v1.1) — all confirmed in code
 ```bash
 init, scrape, connect, check-connections, sequence,
-email, email-sequence, add-email, workflow, dashboard, lead, reply, config, test
+email, email-sequence, add-email, find-email, find-emails,
+workflow, dashboard, lead, reply, config, status,
+enrich, enrich-all, check-replies, research, personalize, test, help
 ```
 
 ### New Commands (v2.0)
 ```bash
 # Machine-readable output (Phase 1)
-<any command> --json         # {"success": bool, "count": int, "data": [...]}
+<any command> --toon         # {"success": bool, "count": int, "data": [...]}
 <any command> --quiet        # Suppress output for scripting
 status                       # System health JSON
 scrape                       # Uses local icp.json if query/location omitted
@@ -368,6 +373,11 @@ enrich-all --max N           # Batch enrich connected leads
 
 # Inbox & replies (Phase 4)
 check-replies                # Playwright scan of LinkedIn inbox
+
+# Research & Personalization (NEW)
+research <id>                   # Research company via agent-browser
+personalize <id>                # Generate personalization angle  
+set-company-url <id> <url>      # Set company URL for research
 
 # Scheduling (Phase 5)
 cron                         # Full morning workflow (for launchd/cron)
@@ -384,27 +394,27 @@ The following must be added to `AGENTS.md` at the repo root before Mode B is usa
 ## SalesBud CLI Reference for AI Agents
 
 ### Always start with:
-python -m salesbud status --json
+python -m salesbud status --toon
 
 ### Discover current state:
-python -m salesbud dashboard --json
+python -m salesbud dashboard --toon
 
 ### Find leads (reads --query/--location from icp.json if omitted):
-python -m salesbud scrape --json
+python -m salesbud scrape --toon
 # Or specify explicitly:
-python -m salesbud scrape --query "CEO" --location "Austin" --max 20 --json
+python -m salesbud scrape --query "CEO" --location "Austin" --max 20 --toon
 
 ### Discover emails (for leads without email):
-python -m salesbud find-emails --max 10 --json
+python -m salesbud find-emails --max 10 --toon
 # OR: use agent-browser to find email manually, then:
-python -m salesbud add-email <id> <email> --json
+python -m salesbud add-email <id> <email> --toon
 
 ### Run sequences:
-python -m salesbud sequence --json
-python -m salesbud email-sequence --json
+python -m salesbud sequence --toon
+python -m salesbud email-sequence --toon
 
 ### Check for replies:
-python -m salesbud check-replies --json
+python -m salesbud check-replies --toon
 
 ### All JSON output follows this schema:
 {"success": bool, "count": int, "data": [...], "errors": [...]}
@@ -443,6 +453,8 @@ ALTER TABLE leads ADD COLUMN buying_signals TEXT;       -- JSON list
 ALTER TABLE leads ADD COLUMN email_source TEXT;        -- browser/manual/smtp-guess
 ALTER TABLE leads ADD COLUMN email_verified INTEGER DEFAULT 0;
 ALTER TABLE leads ADD COLUMN enriched_at TEXT;
+ALTER TABLE leads ADD COLUMN company_research TEXT;      -- agent-browser snapshot
+ALTER TABLE leads ADD COLUMN personalization_angle TEXT; -- generated icebreaker
 ```
 
 ---
@@ -482,8 +494,8 @@ ALTER TABLE leads ADD COLUMN enriched_at TEXT;
 - [x] Rate limiting enforced for both DMs and emails
 
 ### Not yet complete (must pass before v2.0 ship)
-- [x] `--json` flag works on all 14+ commands, output parseable by `json.loads()`
-- [x] `status --json` returns system health without DB writes
+- [x] `--toon` flag works on all 14+ commands, output parseable by `json.loads()`
+- [x] `status --toon` returns system health without DB writes
 - [x] Exit codes: 0=ok, 1=error, 2=rate-limited, 3=nothing-to-process
 - [x] `AGENTS.md` exists at repo root with full CLI reference
 - [x] Real LinkedIn DM send implemented in `send_dm()` production path
@@ -510,11 +522,11 @@ uv run python scripts/prod_check.py
 
 # 1. Initialize database (or migrate)
 python -m salesbud init
-python -m salesbud init --json
+python -m salesbud init --toon
 
 # 2. Check system status
 python -m salesbud status
-python -m salesbud status --json
+python -m salesbud status --toon
 
 # 3. Check config
 python -m salesbud config
@@ -528,11 +540,11 @@ python -m salesbud email --to test@example.com -s "Test" -b "Hello"
 
 # 6. Run sequence (dry-run)
 python -m salesbud sequence
-python -m salesbud sequence --json
+python -m salesbud sequence --toon
 
 # 7. Run email sequence (dry-run)
 python -m salesbud email-sequence
-python -m salesbud email-sequence --json
+python -m salesbud email-sequence --toon
 ```
 
 ### Steps to Go Live
