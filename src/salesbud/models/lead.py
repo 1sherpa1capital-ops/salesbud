@@ -19,7 +19,6 @@ def get_all_leads() -> List[Dict[str, Any]]:
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM leads ORDER BY created_at DESC")
     rows = cursor.fetchall()
-    conn.close()
     return [dict(row) for row in rows]
 
 
@@ -37,7 +36,6 @@ def get_lead_by_id(lead_id: int) -> Optional[Dict[str, Any]]:
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM leads WHERE id = ?", (lead_id,))
     row = cursor.fetchone()
-    conn.close()
     return dict(row) if row else None
 
 
@@ -47,7 +45,6 @@ def get_leads_by_status(status: str) -> List[Dict[str, Any]]:
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM leads WHERE status = ? ORDER BY created_at DESC", (status,))
     rows = cursor.fetchall()
-    conn.close()
     return [dict(row) for row in rows]
 
 
@@ -89,7 +86,7 @@ def add_lead(
         row = cursor.fetchone()
         lead_id = row["id"] if row else 0
     finally:
-        conn.close()
+        pass  # Singleton connection - do not close
     return lead_id  # type: ignore[return-value]
 
 
@@ -108,7 +105,6 @@ def update_lead_status(lead_id: int, status: str, sequence_step: Optional[int] =
             (status, lead_id),
         )
     conn.commit()
-    conn.close()
 
 
 def update_lead_dm_sent(lead_id: int, sequence_step: int):
@@ -120,7 +116,6 @@ def update_lead_dm_sent(lead_id: int, sequence_step: int):
         (sequence_step, lead_id),
     )
     conn.commit()
-    conn.close()
 
 
 def get_lead_stats() -> Dict[str, int]:
@@ -159,8 +154,6 @@ def get_lead_stats() -> Dict[str, int]:
     cursor.execute("SELECT COUNT(*) FROM leads WHERE email_sequence_step >= 4")
     email_completed = cursor.fetchone()[0]
 
-    conn.close()
-
     return {
         "total": total,
         "new": new_count,
@@ -183,7 +176,6 @@ def update_lead_email(lead_id: int, email: str):
         "UPDATE leads SET email = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (email, lead_id)
     )
     conn.commit()
-    conn.close()
 
 
 def update_lead_email_sent(lead_id: int, email_step: int):
@@ -195,7 +187,6 @@ def update_lead_email_sent(lead_id: int, email_step: int):
         (email_step, lead_id),
     )
     conn.commit()
-    conn.close()
 
 
 def update_lead_company_url(lead_id: int, company_url: str):
@@ -207,7 +198,6 @@ def update_lead_company_url(lead_id: int, company_url: str):
         (company_url, lead_id),
     )
     conn.commit()
-    conn.close()
 
 
 def update_lead_research(lead_id: int, research_data: str):
@@ -219,7 +209,6 @@ def update_lead_research(lead_id: int, research_data: str):
         (research_data, lead_id),
     )
     conn.commit()
-    conn.close()
 
 
 def update_lead_personalization(lead_id: int, personalization: str):
@@ -231,7 +220,6 @@ def update_lead_personalization(lead_id: int, personalization: str):
         (personalization, lead_id),
     )
     conn.commit()
-    conn.close()
 
 
 def get_leads_paginated(
@@ -262,5 +250,4 @@ def get_leads_paginated(
         )
 
     rows = cursor.fetchall()
-    conn.close()
     return [dict(row) for row in rows]

@@ -67,14 +67,27 @@ def get_db():
     """Get database connection with row factory.
 
     Uses singleton pattern with WAL mode for better concurrency.
+    Automatically reopens connection if it was closed.
     """
     global _db_connection
+
+    # Check if connection exists and is still open
+    if _db_connection is not None:
+        try:
+            # Test if connection is still valid
+            _db_connection.execute("SELECT 1")
+        except (sqlite3.ProgrammingError, sqlite3.Error):
+            # Connection was closed or is broken, recreate it
+            _db_connection = None
+
+    # Create new connection if needed
     if _db_connection is None:
         _db_connection = sqlite3.connect(DB_PATH, check_same_thread=False)
         _db_connection.row_factory = sqlite3.Row
         # Enable WAL mode for better concurrency
         _db_connection.execute("PRAGMA journal_mode=WAL")
         _db_connection.execute("PRAGMA synchronous=NORMAL")
+
     return _db_connection
 
 
