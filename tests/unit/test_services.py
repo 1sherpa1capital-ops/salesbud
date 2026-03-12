@@ -5,33 +5,33 @@ Unit tests for services (with mocked dependencies)
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
-from salesbud.services.email_finder import find_email_pattern
-from salesbud.services.emailer import sanitize_email_content
+from salesbud.services.email_finder import find_emails_on_page
+from salesbud.services.email_finder import extract_domain_from_linkedin
 
 
 class TestEmailFinder:
     """Test email discovery functionality"""
 
-    def test_find_email_pattern_valid(self):
+    def test_find_emails_on_page_valid(self):
         """Test email pattern extraction from text"""
         text = "Contact us at hello@example.com for more info"
-        emails = find_email_pattern(text)
+        emails = find_emails_on_page(text)
 
         assert "hello@example.com" in emails
 
-    def test_find_email_pattern_multiple(self):
+    def test_find_emails_on_page_multiple(self):
         """Test extracting multiple emails"""
         text = "Emails: first@test.com and second@test.com"
-        emails = find_email_pattern(text)
+        emails = find_emails_on_page(text)
 
         assert len(emails) == 2
         assert "first@test.com" in emails
         assert "second@test.com" in emails
 
-    def test_find_email_pattern_invalid(self):
+    def test_find_emails_on_page_invalid(self):
         """Test that invalid emails are rejected"""
         text = "Not an email: @test.com or test@"
-        emails = find_email_pattern(text)
+        emails = find_emails_on_page(text)
 
         assert len(emails) == 0
 

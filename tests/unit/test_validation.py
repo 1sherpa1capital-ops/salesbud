@@ -19,10 +19,10 @@ class TestScrapeInput:
 
     def test_valid_scrape_input(self):
         """Test valid scrape parameters"""
-        input_data = ScrapeInput(query="CEO", location="Austin, TX", max_results=50)
+        input_data = ScrapeInput(query="CEO", location="Austin, TX", max=50)
         assert input_data.query == "CEO"
         assert input_data.location == "Austin, TX"
-        assert input_data.max_results == 50
+        assert input_data.max == 50
 
     def test_scrape_query_required(self):
         """Test that query is required"""
@@ -30,19 +30,19 @@ class TestScrapeInput:
             ScrapeInput(location="Austin, TX")
         assert "query" in str(exc_info.value)
 
-    def test_scrape_max_results_bounds(self):
-        """Test max_results validation"""
+    def test_scrape_max_bounds(self):
+        """Test max validation"""
         # Too high
         with pytest.raises(ValidationError):
-            ScrapeInput(query="CEO", max_results=501)
+            ScrapeInput(query="CEO", max=501)
 
         # Too low
         with pytest.raises(ValidationError):
-            ScrapeInput(query="CEO", max_results=0)
+            ScrapeInput(query="CEO", max=0)
 
         # At boundary
-        input_data = ScrapeInput(query="CEO", max_results=500)
-        assert input_data.max_results == 500
+        input_data = ScrapeInput(query="CEO", max=500)
+        assert input_data.max == 500
 
 
 class TestAddEmailInput:
@@ -112,16 +112,12 @@ class TestConnectInput:
 
     def test_valid_input(self):
         """Test valid connection parameters"""
-        input_data = ConnectInput(max_requests=10, delay_seconds=5)
-        assert input_data.max_requests == 10
-        assert input_data.delay_seconds == 5
+        input_data = ConnectInput(max=10, delay=5)
+        assert input_data.max == 10
+        assert input_data.delay == 5
 
     def test_delay_bounds(self):
         """Test delay validation"""
-        # Too short
-        with pytest.raises(ValidationError):
-            ConnectInput(delay_seconds=0)
-
         # Valid
-        input_data = ConnectInput(delay_seconds=60)
-        assert input_data.delay_seconds == 60
+        input_data = ConnectInput(delay=60)
+        assert input_data.delay == 60

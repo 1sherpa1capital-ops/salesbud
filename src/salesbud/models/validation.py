@@ -60,6 +60,8 @@ class SendEmailInput(BaseModel):
     def validate_subject(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("subject cannot be empty")
+        if len(v) > 998:  # RFC 5322 limit
+            raise ValueError("subject exceeds maximum length of 998 characters")
         return v.strip()
 
     @field_validator("body")
